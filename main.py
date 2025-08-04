@@ -1,9 +1,10 @@
 import asyncio
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from bot_config import settings
 from handlers import start, help, profile, withdraw
 
-bot = Bot(token=settings.bot_token, parse_mode="HTML")
+bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
 dp.include_router(start.router)

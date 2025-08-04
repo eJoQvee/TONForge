@@ -1,11 +1,11 @@
 from dotenv import load_dotenv
-from pydantic import BaseSettings
+from pydantic import BaseModel
 import os
 
 load_dotenv()
 
 
-class Settings(BaseSettings):
+class Settings(BaseModel):
     bot_token: str = os.getenv("BOT_TOKEN")
     ton_api_key: str | None = os.getenv("TON_API_KEY")
     tron_api_key: str | None = os.getenv("TRON_API_KEY")
