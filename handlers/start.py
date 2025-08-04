@@ -1,5 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import Message
+from sqlalchemy import select
 from database.db import get_session
 from database import models
 
@@ -16,7 +17,10 @@ async def cmd_start(message: Message):
             pass
 
     async for session in get_session():
-        user = await session.get(models.User, message.from_user.id)
+        result = await session.execute(
+            select(models.User).where(models.User.telegram_id == message.from_user.id)
+        )
+        user = result.scalar_one_or_none()
         if not user:
             user = models.User(
                 telegram_id=message.from_user.id,
