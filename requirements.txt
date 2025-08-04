@@ -1,0 +1,10 @@
+aiogram
+fastapi
+uvicorn
+SQLAlchemy
+asyncpg
+alembic
+redis
+python-dotenv
+pydantic
+httpx
