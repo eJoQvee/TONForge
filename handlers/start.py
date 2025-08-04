@@ -25,7 +25,7 @@ async def cmd_start(message: Message):
             user = models.User(
                 telegram_id=message.from_user.id,
                 language=message.from_user.language_code or "ru",
-                referrer_id=ref_id
+                referrer_id=ref_id,
             )
             session.add(user)
             await session.commit()

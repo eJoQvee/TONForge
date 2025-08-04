@@ -17,6 +17,8 @@ async def cmd_profile(message: Message):
         if not user:
             await message.answer("Вы не зарегистрированы. Используйте /start.")
             return
-        text = (f"Баланс TON: {user.balance_ton}\n"
-                f"Баланс USDT: {user.balance_usdt}")
+        text = (
+            f"Баланс TON: {user.balance_ton}\n"
+            f"Баланс USDT: {user.balance_usdt}"
+        )
         await message.answer(text)
