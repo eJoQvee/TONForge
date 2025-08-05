@@ -38,3 +38,16 @@ class Withdrawal(Base):
     currency: Mapped[str] = mapped_column(String(4))
     requested_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     processed: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+
+class Invite(Base):
+    __tablename__ = "invites"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    external_url: Mapped[str] = mapped_column(String)
+    short_link: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User")

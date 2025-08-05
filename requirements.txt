@@ -29,3 +29,5 @@ typing-inspection==0.4.1
 typing_extensions==4.14.1
 yarl==1.20.1
 requests==2.31.0
+SQLAlchemy==2.0.36
+asyncpg==0.29.0

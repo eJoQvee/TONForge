@@ -14,6 +14,7 @@ class Settings(BaseModel):
     admin_password: str = os.getenv("ADMIN_PASSWORD")
     channel_id: str | None = os.getenv("CHANNEL_ID")
     base_webapp_url: str = os.getenv("BASE_WEBAPP_URL")
+    teleport_api_url: str = os.getenv("TELEPORT_API_URL", "https://teleport.blender")
 
 
 settings = Settings()
