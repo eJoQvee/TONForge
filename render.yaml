@@ -9,7 +9,7 @@ services:
     startCommand: python main.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.8
+        value: 3.12.8
       - key: BOT_TOKEN
         value: ${BOT_TOKEN}
       - key: DATABASE_URL
