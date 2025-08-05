@@ -3,6 +3,7 @@ from aiogram.types import Message
 from sqlalchemy import select
 from database.db import get_session
 from database import models
+from utils.helpers import format_ton
 
 router = Router()
 
@@ -18,7 +19,7 @@ async def cmd_profile(message: Message):
             await message.answer("Вы не зарегистрированы. Используйте /start.")
             return
         text = (
-            f"Баланс TON: {user.balance_ton}\n"
+            f"Баланс TON: {format_ton(int(user.balance_ton))}\n"
             f"Баланс USDT: {user.balance_usdt}"
         )
         await message.answer(text)

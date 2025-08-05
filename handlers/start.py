@@ -4,6 +4,7 @@ from aiogram.filters import CommandStart, CommandObject
 from sqlalchemy import select
 from database.db import get_session
 from database import models
+from utils.referrals import add_referral
 
 router = Router()
 
@@ -26,9 +27,10 @@ async def cmd_start(message: Message, command: CommandObject):
             user = models.User(
                 telegram_id=message.from_user.id,
                 language=message.from_user.language_code or "ru",
-                referrer_id=ref_id,
             )
             session.add(user)
             await session.commit()
+        if ref_id:
+            await add_referral(session, ref_id, user.id)
 
     await message.answer("Добро пожаловать в TONForge! Используйте /profile для просмотра профиля.")

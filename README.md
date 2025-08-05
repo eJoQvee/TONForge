@@ -4,14 +4,29 @@ Telegram-based investment bot MVP.
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and fill in required values.
-2. Install dependencies:
+1. Create and activate a virtual environment:
 
    ```bash
-   pip install -r requirements.txt
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
    ```
-   This installs packages such as `aiogram`, which is required to run the bot.
-3. Initialize the database tables:
+
+2. Copy `.env.example` to `.env` and fill in required values. The `TELEPORT_API_URL`
+   is available in the Teleport dashboard: https://teleport.org/dashboard.
+3. Start PostgreSQL and Redis using Docker:
+
+   ```bash
+   docker-compose up -d
+   ```
+
+   Verify connections:
+
+   ```bash
+   docker-compose exec postgres pg_isready -U $POSTGRES_USER
+   docker-compose exec redis redis-cli ping
+   ```
+
+4. Initialize the database tables:
 
    ```bash
    python - <<'PY'
@@ -26,7 +41,7 @@ async def main():
 asyncio.run(main())
 PY
    ```
-4. Start the bot:
+5. Start the bot:
 
    ```bash
    python main.py
