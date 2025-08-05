@@ -1,7 +1,7 @@
-import httpx
 import logging
 from bot_config import settings
 from utils.helpers import fetch_json, validate_tron_address
+import httpx
 
 TRON_API_URL = "https://api.trongrid.io"  # пример
 
@@ -9,19 +9,64 @@ logger = logging.getLogger(__name__)
 
 
 async def check_deposit(address: str, label: str, min_amount: float) -> float:
+    """Check incoming USDT (TRC20) transaction.
+
+    Args:
+        address: Recipient TRON address.
+        label:   Memo/label that should be attached to the transaction.
+        min_amount: Minimal amount (in USDT) to consider the deposit valid.
+
+    Returns:
+        Amount received in USDT if a matching transaction is found, otherwise
+        ``0.0``.
     """
-    Проверка входящей USDT (TRC20) транзакции.
-    """
+    
     if not validate_tron_address(address):
         raise ValueError("Invalid TRON wallet address")
-    params = {"address": address, "token": "USDT"}
-    headers = {"TRON-PRO-API-KEY": settings.tron_api_key} if settings.tron_api_key else None
-    data = await fetch_json(
+    
+    params = {
+        "address": address,
+        "limit": 50,
+        "order_by": "block_timestamp,desc",
+    }
+    headers = (
+        {"TRON-PRO-API-KEY": settings.tron_api_key}
+        if settings.tron_api_key
+        else None
+    )
+        data = await fetch_json(
         f"{TRON_API_URL}/v1/accounts/{address}/transactions/trc20",
         params=params,
         headers=headers,
     )
-    # TODO: фильтрация по memo/label в data
+    
+    transactions = data.get("data") or []
+    for tx in transactions:
+        # Decode memo if present (hex string)
+        memo_hex = tx.get("data") or ""
+        if memo_hex.startswith("0x"):
+            memo_hex = memo_hex[2:]
+        try:
+            memo = bytes.fromhex(memo_hex).decode("utf-8")
+        except Exception:
+            memo = ""
+        if memo != label:
+            continue
+
+        if tx.get("token_info", {}).get("symbol") != "USDT":
+            continue
+
+        value = tx.get("value") or tx.get("result", {}).get("value")
+        if value is None:
+            continue
+        try:
+            amount = int(value) / 1_000_000  # USDT has 6 decimals
+        except (TypeError, ValueError):
+            continue
+
+        if amount >= min_amount:
+            return amount
+
     return 0.0
 
 
