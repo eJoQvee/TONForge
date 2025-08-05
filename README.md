@@ -29,17 +29,8 @@ Telegram-based investment bot MVP.
 4. Initialize the database tables:
 
    ```bash
-   python - <<'PY'
-import asyncio
-from database.db import engine
-from database import models
+      python database/migrate.py
 
-async def main():
-    async with engine.begin() as conn:
-        await conn.run_sync(models.Base.metadata.create_all)
-
-asyncio.run(main())
-PY
    ```
 5. Start the bot:
 
