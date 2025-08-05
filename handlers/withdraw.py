@@ -12,7 +12,7 @@ router = Router()
 @router.message(F.text == "/withdraw")
 async def cmd_withdraw(message: Message):
     async for session in get_session():
-         result = await session.execute(
+        result = await session.execute(
             select(models.User).where(models.User.telegram_id == message.from_user.id)
         )
         user = result.scalar_one_or_none()
