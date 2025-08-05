@@ -13,7 +13,7 @@ async def cmd_start(message: Message, command: CommandObject):
     ref_id = None
     if command.args:
         try:
-            ref_id = int(command.args))
+            ref_id = int(command.args)
         except ValueError:
             pass
 
