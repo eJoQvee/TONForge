@@ -13,7 +13,9 @@ class User(Base):
     balance_ton: Mapped[float] = mapped_column(Float, default=0)
     balance_usdt: Mapped[float] = mapped_column(Float, default=0)
     referrer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     referrer = relationship("User", remote_side=[id])
 
@@ -25,7 +27,11 @@ class Deposit(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     amount: Mapped[float]
     currency: Mapped[str] = mapped_column(String(4))  # TON/USDT
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Address where the deposit was sent (used for USDT/TRON deposits)
+    address: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
@@ -36,7 +42,11 @@ class Withdrawal(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     amount: Mapped[float]
     currency: Mapped[str] = mapped_column(String(4))
-    requested_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Destination wallet for the withdrawal
+    address: Mapped[str | None] = mapped_column(String, nullable=True)
+    requested_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     processed: Mapped[bool] = mapped_column(Boolean, default=False)
     
 
@@ -48,6 +58,8 @@ class Invite(Base):
     external_url: Mapped[str] = mapped_column(String)
     short_link: Mapped[str | None] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     user = relationship("User")

@@ -2,14 +2,9 @@ from sqlalchemy import select, func
 
 from database.models import User, Deposit
 
-
 REF_PERCENTS = [0.10, 0.05, 0.03, 0.02, 0.01]
 
 
-async def distribute_referral_income(session, user_id: int, amount: float, currency: str):
-    """
-    Распределяет реферальное вознаграждение по цепочке до 5 уровней.
-    """
 async def add_referral(session, inviter_id: int, invitee_id: int) -> None:
     """Adds a referral relation between inviter and invitee."""
     if inviter_id == invitee_id:
@@ -22,6 +17,10 @@ async def add_referral(session, inviter_id: int, invitee_id: int) -> None:
     await session.commit()
 
 
+def _invited_ids_query(user_id: int):
+    return select(User.id).where(User.referrer_id == user_id)
+
+
 async def get_referral_stats(session, user_id: int) -> dict:
     """Returns number of invitees and total referral bonuses."""
     invited_count = await session.scalar(
@@ -30,11 +29,7 @@ async def get_referral_stats(session, user_id: int) -> dict:
 
     deposit_sums = await session.execute(
         select(Deposit.currency, func.sum(Deposit.amount))
-        .where(
-            Deposit.user_id.in_(
-                select(User.id).where(User.referrer_id == user_id)
-            )
-        )
+        .where(Deposit.user_id.in_(_invited_ids_query(user_id)))
         .group_by(Deposit.currency)
     )
     bonus_ton = bonus_usdt = 0.0

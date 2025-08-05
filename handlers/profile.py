@@ -1,9 +1,11 @@
 from aiogram import Router, F
 from aiogram.types import Message
 from sqlalchemy import select
+
 from database.db import get_session
 from database import models
 from utils.helpers import format_ton
+from utils.i18n import t
 
 router = Router()
 
@@ -16,10 +18,14 @@ async def cmd_profile(message: Message):
         )
         user = result.scalar_one_or_none()
         if not user:
-            await message.answer("Вы не зарегистрированы. Используйте /start.")
+            lang = message.from_user.language_code or "en"
+            lang = lang if lang in ("ru", "en") else "en"
+            await message.answer(t(lang, "not_registered"))
             return
-        text = (
-            f"Баланс TON: {format_ton(int(user.balance_ton))}\n"
-            f"Баланс USDT: {user.balance_usdt}"
+        text = t(
+            user.language,
+            "profile",
+            ton=format_ton(int(user.balance_ton)),
+            usdt=user.balance_usdt,
         )
         await message.answer(text)

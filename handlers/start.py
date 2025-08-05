@@ -2,9 +2,11 @@ from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import CommandStart, CommandObject
 from sqlalchemy import select
+
 from database.db import get_session
 from database import models
 from utils.referrals import add_referral
+from utils.i18n import t
 
 router = Router()
 
@@ -24,13 +26,11 @@ async def cmd_start(message: Message, command: CommandObject):
         )
         user = result.scalar_one_or_none()
         if not user:
-            user = models.User(
-                telegram_id=message.from_user.id,
-                language=message.from_user.language_code or "ru",
-            )
-            session.add(user)
+            lang = message.from_user.language_code or "en"
+            lang = lang if lang in ("ru", "en") else "en"
+            user = models.User(telegram_id=message.from_user.id, language=lang)            session.add(user)
             await session.commit()
         if ref_id:
             await add_referral(session, ref_id, user.id)
 
-    await message.answer("Добро пожаловать в TONForge! Используйте /profile для просмотра профиля.")
+    await message.answer(t(user.language, "welcome"))

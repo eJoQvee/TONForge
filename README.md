@@ -38,4 +38,10 @@ Telegram-based investment bot MVP.
    python main.py
    ```
 
+6. Run the WebView backend (FastAPI):
+
+   ```bash
+   uvicorn webview.backend.main:app --reload
+   ```
+
 Running `python main.py` requires network access to Telegram servers.
