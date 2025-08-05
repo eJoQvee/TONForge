@@ -1,5 +1,6 @@
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.types import Message
+from aiogram.filters import CommandStart, CommandObject
 from sqlalchemy import select
 from database.db import get_session
 from database import models
@@ -7,12 +8,12 @@ from database import models
 router = Router()
 
 
-@router.message(F.text == "/start")
-async def cmd_start(message: Message):
+@router.message(CommandStart())
+async def cmd_start(message: Message, command: CommandObject):
     ref_id = None
-    if message.get_args():
+    if command.args:
         try:
-            ref_id = int(message.get_args())
+            ref_id = int(command.args))
         except ValueError:
             pass
 
