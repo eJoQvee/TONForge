@@ -1,5 +1,10 @@
 from aiogram import Router
-from aiogram.types import Message
+from aiogram.types import (
+    Message,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    WebAppInfo,
+)
 from aiogram.filters import CommandStart, CommandObject
 from sqlalchemy import select
 
@@ -7,6 +12,7 @@ from database.db import get_session
 from database import models
 from utils.referrals import add_referral
 from utils.i18n import t
+from bot_config import settings
 
 router = Router()
 
@@ -34,4 +40,27 @@ async def cmd_start(message: Message, command: CommandObject):
         if ref_id:
             await add_referral(session, ref_id, user.id)
 
-    await message.answer(t(user.language, "welcome"))
+    keyboard_buttons = [
+        [
+            KeyboardButton(text="/profile"),
+            KeyboardButton(text="/referrals"),
+        ],
+        [
+            KeyboardButton(text="/deposit 10 TON"),
+            KeyboardButton(text="/withdraw"),
+        ],
+    ]
+
+    if settings.base_webapp_url:
+        keyboard_buttons.append(
+            [
+                KeyboardButton(
+                    text=t(user.language, "open_app"),
+                    web_app=WebAppInfo(url=settings.base_webapp_url),
+                )
+            ]
+        )
+
+    reply_kb = ReplyKeyboardMarkup(keyboard=keyboard_buttons, resize_keyboard=True)
+
+    await message.answer(t(user.language, "welcome"), reply_markup=reply_kb)
