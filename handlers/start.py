@@ -51,7 +51,7 @@ async def cmd_start(message: Message, command: CommandObject):
         ],
     ]
 
-        if settings.base_webapp_url:
+    if settings.base_webapp_url:
             url = f"{settings.base_webapp_url}?user_id={message.from_user.id}"
             keyboard_buttons.append(
                 [
