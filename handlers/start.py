@@ -28,7 +28,8 @@ async def cmd_start(message: Message, command: CommandObject):
         if not user:
             lang = message.from_user.language_code or "en"
             lang = lang if lang in ("ru", "en") else "en"
-            user = models.User(telegram_id=message.from_user.id, language=lang)            session.add(user)
+            user = models.User(telegram_id=message.from_user.id, language=lang)
+            session.add(user)
             await session.commit()
         if ref_id:
             await add_referral(session, ref_id, user.id)
