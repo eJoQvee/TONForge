@@ -18,3 +18,8 @@ export const getReferralInfo = async (user_id) => {
   const res = await fetch(`${BASE_URL}/referrals?user_id=${user_id}`);
   return await res.json();
 };
+
+export const getOperations = async (user_id) => {
+  const res = await fetch(`${BASE_URL}/operations?user_id=${user_id}`);
+  return await res.json();
+};

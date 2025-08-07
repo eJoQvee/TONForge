@@ -87,3 +87,53 @@ async def get_profile(
         "balance_usdt": user.balance_usdt,
         "referrals": stats,
     }
+
+
+@app.get("/operations")
+async def operations(
+    user_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """Return deposit and withdrawal history for the user."""
+    result = await session.execute(
+        select(models.User).where(models.User.telegram_id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    deposits = await session.execute(
+        select(
+            models.Deposit.amount,
+            models.Deposit.currency,
+            models.Deposit.created_at,
+        ).where(models.Deposit.user_id == user.id)
+    )
+    withdrawals = await session.execute(
+        select(
+            models.Withdrawal.amount,
+            models.Withdrawal.currency,
+            models.Withdrawal.requested_at,
+            models.Withdrawal.processed,
+        ).where(models.Withdrawal.user_id == user.id)
+    )
+    return {
+        "deposits": [
+            {
+                "amount": amount,
+                "currency": currency,
+                "created_at": created_at.isoformat() if created_at else None,
+            }
+            for amount, currency, created_at in deposits.all()
+        ],
+        "withdrawals": [
+            {
+                "amount": amount,
+                "currency": currency,
+                "requested_at": requested_at.isoformat()
+                if requested_at
+                else None,
+                "processed": processed,
+            }
+            for amount, currency, requested_at, processed in withdrawals.all()
+        ],
+    }

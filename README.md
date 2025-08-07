@@ -41,7 +41,14 @@ Telegram-based investment bot MVP.
 6. Run the WebView backend (FastAPI):
 
    ```bash
-   uvicorn webview.backend.main:app --reload
-   ```
+    uvicorn webview.backend.main:app --reload
+    ```
+
+7. Launch the WebView frontend (React):
+
+    ```bash
+    cd webview/frontend
+    npm start
+    ```
 
 Running `python main.py` requires network access to Telegram servers.
