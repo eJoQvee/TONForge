@@ -51,16 +51,16 @@ async def cmd_start(message: Message, command: CommandObject):
         ],
     ]
 
-    if settings.base_webapp_url:
-        keyboard_buttons.append(
-            [
-                KeyboardButton(
-                    text=t(user.language, "open_app"),
-                    web_app=WebAppInfo(
-                        url=f"{settings.base_webapp_url}?user_id={message.from_user.id}"
-    ),
-            ]
-        )
+        if settings.base_webapp_url:
+            url = f"{settings.base_webapp_url}?user_id={message.from_user.id}"
+            keyboard_buttons.append(
+                [
+                     KeyboardButton(
+                         text=t(user.language, "open_app"),
+                         web_app=WebAppInfo(url=url),
+                    )
+                ]
+           )
 
     reply_kb = ReplyKeyboardMarkup(keyboard=keyboard_buttons, resize_keyboard=True)
 
