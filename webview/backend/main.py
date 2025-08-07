@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,7 @@ from services.income import DAILY_PERCENT
 from utils.referrals import get_referral_stats
 
 app = FastAPI()
+router = APIRouter(prefix="/api")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # adjust for production
@@ -19,13 +20,13 @@ app.add_middleware(
 )
 
 
-@app.get("/health")
+@router.get("/health")
 async def health() -> dict:
     """Simple health check endpoint."""
     return {"status": "ok"}
 
 
-@app.get("/balance")
+@router.get("/balance")
 async def balance(
     user_id: int, session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -50,14 +51,14 @@ class GenerateLabelRequest(BaseModel):
     amount: float
 
 
-@app.post("/generate_label")
+@router.post("/generate_label")
 async def generate_label(data: GenerateLabelRequest) -> dict:
     label = f"{data.user_id}-{uuid4().hex}"
     address = "TON_WALLET" if data.method.upper() == "TON" else "USDT_WALLET"
     return {"address": address, "label": label}
 
 
-@app.get("/referrals")
+@router.get("/referrals")
 async def referrals(
     user_id: int, session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -73,7 +74,7 @@ async def referrals(
     return {"link": link, "count": stats["invited"], "earned": earned}
 
 
-@app.get("/profile/{telegram_id}")
+@router.get("/profile/{telegram_id}")
 async def get_profile(
     telegram_id: int, session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -92,7 +93,7 @@ async def get_profile(
     }
 
 
-@app.get("/operations")
+@router.get("/operations")
 async def operations(
     user_id: int, session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -140,3 +141,5 @@ async def operations(
             for amount, currency, requested_at, processed in withdrawals.all()
         ],
     }
+    
+app.include_router(router

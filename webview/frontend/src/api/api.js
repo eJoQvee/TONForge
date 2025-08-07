@@ -1,4 +1,4 @@
-const BASE_URL = "https://your-fastapi-domain.com/api";
+const BASE_URL = process.env.REACT_APP_API_URL || "/api";
 
 export const getBalance = async (user_id) => {
   const res = await fetch(`${BASE_URL}/balance?user_id=${user_id}`);
