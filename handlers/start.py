@@ -56,8 +56,9 @@ async def cmd_start(message: Message, command: CommandObject):
             [
                 KeyboardButton(
                     text=t(user.language, "open_app"),
-                    web_app=WebAppInfo(url=settings.base_webapp_url),
-                )
+                    web_app=WebAppInfo(
+                        url=f"{settings.base_webapp_url}?user_id={message.from_user.id}"
+    ),
             ]
         )
 
