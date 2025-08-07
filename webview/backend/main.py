@@ -2,9 +2,12 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
+from uuid import uuid4
 
 from database.db import get_session
 from database import models
+from services.income import DAILY_PERCENT
 from utils.referrals import get_referral_stats
 
 app = FastAPI()
