@@ -21,7 +21,7 @@ async def cmd_withdraw(message: Message):
         )
         user = result.scalar_one_or_none()
         if not user:
-            await await message.answer(t(lang, "not_registered"))
+            await message.answer(t(lang, "not_registered"))
             return
 
         if user.balance_ton < MIN_WITHDRAW and user.balance_usdt < MIN_WITHDRAW:
