@@ -31,6 +31,7 @@ def test_deposit_with_address():
             session.add(dep)
             await session.commit()
             assert dep.address == "ADDR"
+            assert user.deposits[0] == dep
         await engine.dispose()
 
     asyncio.run(inner())
@@ -49,6 +50,7 @@ def test_withdrawal_with_address():
             session.add(wd)
             await session.commit()
             assert wd.address == "TONADDR"
+            assert user.withdrawals[0] == wd
         await engine.dispose()
 
     asyncio.run(inner())

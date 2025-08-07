@@ -18,6 +18,9 @@ class User(Base):
     )
 
     referrer = relationship("User", remote_side=[id])
+    deposits = relationship("Deposit", back_populates="user", cascade="all, delete-orphan")
+    withdrawals = relationship("Withdrawal", back_populates="user", cascade="all, delete-orphan")
+    invites = relationship("Invite", back_populates="user", cascade="all, delete-orphan")
 
 
 class Deposit(Base):
@@ -34,6 +37,8 @@ class Deposit(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    user = relationship("User")
+
 
 class Withdrawal(Base):
     __tablename__ = "withdrawals"
@@ -49,6 +54,8 @@ class Withdrawal(Base):
     )
     processed: Mapped[bool] = mapped_column(Boolean, default=False)
     
+    user = relationship("User")
+    
 
 class Invite(Base):
     __tablename__ = "invites"
@@ -62,4 +69,4 @@ class Invite(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    user = relationship("User")
+    user = relationship("User", back_populates="invites")
