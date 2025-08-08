@@ -6,7 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from bot_config import settings
 from handlers import start, help, profile, withdraw, deposit, referral, panel
 from database.migrate import migrate
-from utils.scheduler import daily_job
+from utils.scheduler import daily_job, deposit_job
 
 bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()

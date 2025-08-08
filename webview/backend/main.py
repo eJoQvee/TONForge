@@ -11,6 +11,7 @@ from services.income import DAILY_PERCENT
 from utils.referrals import get_referral_stats
 from bot_config import settings
 from services import deposit as deposit_service
+from admin.panel import router as admin_router
 
 app = FastAPI()
 router = APIRouter(prefix="/api")
@@ -38,6 +39,8 @@ async def balance(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="user_not_found")
+    if user.is_blocked:
+        raise HTTPException(status_code=403, detail="user_blocked")
     deposits = await session.execute(
         select(models.Deposit.amount, models.Deposit.currency).where(
             models.Deposit.user_id == user.id, models.Deposit.is_active
@@ -83,6 +86,8 @@ async def referrals(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="user_not_found")
+    if user.is_blocked:
+        raise HTTPException(status_code=403, detail="user_blocked")
     stats = await get_referral_stats(session, user.id)
     link = f"https://t.me/TONForgeBot?start={user_id}"
     earned = stats["bonus_ton"] + stats["bonus_usdt"]
@@ -99,6 +104,8 @@ async def get_profile(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="user_not_found")
+     if user.is_blocked:
+        raise HTTPException(status_code=403, detail="user_blocked")
     stats = await get_referral_stats(session, user.id)
     return {
         "telegram_id": user.telegram_id,
@@ -119,6 +126,8 @@ async def operations(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="user_not_found")
+    if user.is_blocked:
+        raise HTTPException(status_code=403, detail="user_blocked")
 
     deposits = await session.execute(
         select(
@@ -158,3 +167,4 @@ async def operations(
     }
     
 app.include_router(router)
+app.include_router(admin_router)

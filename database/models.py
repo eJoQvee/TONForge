@@ -13,6 +13,7 @@ class User(Base):
     balance_ton: Mapped[float] = mapped_column(Float, default=0)
     balance_usdt: Mapped[float] = mapped_column(Float, default=0)
     referrer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
