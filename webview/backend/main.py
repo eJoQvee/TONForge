@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, APIRouter
+from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +8,7 @@ from uuid import uuid4
 from database.db import get_session
 from database import models
 from utils.referrals import get_referral_stats
+from utils.antifraud import check_and_update_ip
 from bot_config import settings
 from services import deposit as deposit_service
 from admin.panel import router as admin_router
@@ -22,6 +23,23 @@ app.add_middleware(
 )
 
 
+async def _fetch_user(
+    session: AsyncSession, telegram_id: int, request: Request | None = None
+) -> models.User:
+    """Return user by telegram_id and perform IP check."""
+    result = await session.execute(
+        select(models.User).where(models.User.telegram_id == telegram_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="user_not_found")
+    if request:
+        await check_and_update_ip(session, user, request.client.host)
+    if user.is_blocked:
+        raise HTTPException(status_code=403, detail="user_blocked")
+    return user
+
+
 @router.get("/health")
 async def health() -> dict:
     """Simple health check endpoint."""
@@ -30,16 +48,9 @@ async def health() -> dict:
 
 @router.get("/balance")
 async def balance(
-    user_id: int, session: AsyncSession = Depends(get_session)
+    user_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
-    result = await session.execute(
-        select(models.User).where(models.User.telegram_id == user_id)
-    )
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="user_not_found")
-    if user.is_blocked:
-        raise HTTPException(status_code=403, detail="user_blocked")
+    user = await _fetch_user(session, user_id, request)
     cfg = await session.get(models.Config, 1)
     percent = cfg.daily_percent if cfg else 0.023
     deposits = await session.execute(
@@ -59,14 +70,11 @@ class GenerateLabelRequest(BaseModel):
 
 @router.post("/generate_label")
 async def generate_label(
-    data: GenerateLabelRequest, session: AsyncSession = Depends(get_session)
+    data: GenerateLabelRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
 ) -> dict:
-    result = await session.execute(
-        select(models.User).where(models.User.telegram_id == data.user_id)
-    )
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="user_not_found")
+    user = await _fetch_user(session, data.user_id, request)
 
     method = data.method.upper()
     address = settings.ton_wallet if method == "TON" else settings.usdt_wallet
@@ -79,16 +87,9 @@ async def generate_label(
 
 @router.get("/referrals")
 async def referrals(
-    user_id: int, session: AsyncSession = Depends(get_session)
+    user_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
-    result = await session.execute(
-        select(models.User).where(models.User.telegram_id == user_id)
-    )
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="user_not_found")
-    if user.is_blocked:
-        raise HTTPException(status_code=403, detail="user_blocked")
+    user = await _fetch_user(session, user_id, request)
     stats = await get_referral_stats(session, user.id)
     link = f"https://t.me/TONForgeBot?start={user_id}"
     earned = stats["bonus_ton"] + stats["bonus_usdt"]
@@ -97,16 +98,9 @@ async def referrals(
 
 @router.get("/profile/{telegram_id}")
 async def get_profile(
-    telegram_id: int, session: AsyncSession = Depends(get_session)
+    telegram_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
-    result = await session.execute(
-        select(models.User).where(models.User.telegram_id == telegram_id)
-    )
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="user_not_found")
-    if user.is_blocked:
-        raise HTTPException(status_code=403, detail="user_blocked")
+    user = await _fetch_user(session, telegram_id, request)
     stats = await get_referral_stats(session, user.id)
     return {
         "telegram_id": user.telegram_id,
@@ -118,17 +112,10 @@ async def get_profile(
 
 @router.get("/operations")
 async def operations(
-    user_id: int, session: AsyncSession = Depends(get_session)
+    user_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
     """Return deposit and withdrawal history for the user."""
-    result = await session.execute(
-        select(models.User).where(models.User.telegram_id == user_id)
-    )
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="user_not_found")
-    if user.is_blocked:
-        raise HTTPException(status_code=403, detail="user_blocked")
+    user = await _fetch_user(session, user_id, request)
 
     deposits = await session.execute(
         select(

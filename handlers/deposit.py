@@ -44,6 +44,9 @@ async def cmd_deposit(message: Message):
         if not user:
             await message.answer(t(lang, "not_registered"))
             return
+        if user.is_blocked:
+            await message.answer(t(user.language, "blocked"))
+            return
         address = settings.ton_wallet if currency == "TON" else settings.usdt_wallet
         dep = await deposit_service.create_deposit(
             session, user.id, amount, currency, address if currency == "USDT" else None

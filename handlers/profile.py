@@ -22,6 +22,9 @@ async def cmd_profile(message: Message):
             lang = lang if lang in ("ru", "en") else "en"
             await message.answer(t(lang, "not_registered"))
             return
+        if user.is_blocked:
+            await message.answer(t(user.language, "blocked"))
+            return
         text = t(
             user.language,
             "profile",

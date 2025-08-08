@@ -24,6 +24,9 @@ async def cmd_withdraw(message: Message):
         if not user:
             await message.answer(t(lang, "not_registered"))
             return
+        if user.is_blocked:
+            await message.answer(t(user.language, "blocked"))
+            return
 
         cfg = await session.get(models.Config, 1)
         min_withdraw = cfg.min_withdraw if cfg else 50

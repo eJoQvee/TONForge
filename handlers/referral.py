@@ -23,6 +23,9 @@ async def cmd_referrals(message: Message):
         if not user:
             await message.answer(t(lang, "not_registered"))
             return
+        if user.is_blocked:
+            await message.answer(t(user.language, "blocked"))
+            return
         stats = await get_referral_stats(session, user.id)
     text = t(
         user.language,
