@@ -2,9 +2,10 @@ from aiogram import Router, F
 from aiogram.types import Message
 from sqlalchemy import select
 
+from bot_config import settings
 from database.db import get_session
 from database import models
-from utils.referrals import distribute_referral_income
+from services import deposit as deposit_service
 from utils.i18n import t
 
 MIN_DEPOSIT = 10  # TON or USDT
