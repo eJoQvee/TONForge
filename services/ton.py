@@ -79,7 +79,7 @@ async def get_transaction_amount(tx_hash: str) -> float:
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(url, params=params, headers=headers
+            resp = await client.get(url, params=params, headers=headers)
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPError as exc:
