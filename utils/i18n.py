@@ -16,11 +16,11 @@ MESSAGES = {
         "deposit_usage": "Usage: /deposit <amount> <TON|USDT>",
         "deposit_invalid_amount": "Invalid amount",
         "deposit_invalid_currency": "Currency must be TON or USDT",
-        "deposit_min": "Minimum deposit is 10 TON or 10 USDT.",
+        "deposit_min": "Minimum deposit is {min_deposit} TON or {min_deposit} USDT.",
         "deposit_success": "Deposit added successfully",
-        "withdraw_min": "Minimum withdrawal amount is 50 TON or 50 USDT.",
+        "withdraw_min": "Minimum withdrawal amount is {min_withdraw} TON or {min_withdraw} USDT.",
         "withdraw_requested": (
-            "Withdrawal request submitted. Please wait up to 24 hours."
+            "Withdrawal request submitted. Please wait up to {hours} hours."
         ),
         "withdraw_pending": (
             "You already have a pending withdrawal. Please wait until it is processed."
@@ -48,11 +48,11 @@ MESSAGES = {
         "deposit_usage": "Использование: /deposit <сумма> <TON|USDT>",
         "deposit_invalid_amount": "Некорректная сумма",
         "deposit_invalid_currency": "Валюта должна быть TON или USDT",
-        "deposit_min": "Минимальный депозит 10 TON или 10 USDT.",
+        "deposit_min": "Минимальный депозит {min_deposit} TON или {min_deposit} USDT.",
         "deposit_success": "Депозит успешно добавлен",
-        "withdraw_min": "Минимальная сумма для вывода 50 TON или 50 USDT.",
+        "withdraw_min": "Минимальная сумма для вывода {min_withdraw} TON или {min_withdraw} USDT.",
         "withdraw_requested": (
-            "Заявка на вывод отправлена. Ожидайте обработки в течение 24 часов."
+            "Заявка на вывод отправлена. Ожидайте обработки в течение {hours} часов."
         ),
          "withdraw_pending": (
             "У вас уже есть заявка на вывод. Пожалуйста, дождитесь её обработки."

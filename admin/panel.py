@@ -34,6 +34,39 @@ async def stats(session=Depends(get_session)):
     }
 
 
+@router.get("/settings", dependencies=[Depends(auth)])
+async def get_settings(session=Depends(get_session)):
+    cfg = await session.get(models.Config, 1)
+    if not cfg:
+        return {}
+    return {
+        "daily_percent": cfg.daily_percent,
+        "min_deposit": cfg.min_deposit,
+        "min_withdraw": cfg.min_withdraw,
+        "withdraw_delay_hours": cfg.withdraw_delay_hours,
+        "notification_text": cfg.notification_text,
+    }
+
+
+@router.post("/settings", dependencies=[Depends(auth)])
+async def update_settings(data: dict, session=Depends(get_session)):
+    cfg = await session.get(models.Config, 1)
+    if not cfg:
+        cfg = models.Config()
+        session.add(cfg)
+    for field in [
+        "daily_percent",
+        "min_deposit",
+        "min_withdraw",
+        "withdraw_delay_hours",
+        "notification_text",
+    ]:
+        if field in data:
+            setattr(cfg, field, data[field])
+    await session.commit()
+    return {"status": "updated"}
+
+
 @router.get("/users", dependencies=[Depends(auth)])
 async def list_users(session=Depends(get_session)):
     result = await session.execute(select(models.User))

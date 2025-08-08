@@ -7,9 +7,6 @@ from database.db import get_session
 from database import models
 from utils.i18n import t
 
-MIN_WITHDRAW = 50  # TON or USDT
-WAIT_HOURS = 24
-
 router = Router()
 
 
@@ -27,8 +24,12 @@ async def cmd_withdraw(message: Message):
             await message.answer(t(lang, "not_registered"))
             return
 
-        if user.balance_ton < MIN_WITHDRAW and user.balance_usdt < MIN_WITHDRAW:
-            await message.answer(t(user.language, "withdraw_min"))
+        cfg = await session.get(models.Config, 1)
+        min_withdraw = cfg.min_withdraw if cfg else 50
+        wait_hours = cfg.withdraw_delay_hours if cfg else 24
+
+        if user.balance_ton < min_withdraw and user.balance_usdt < min_withdraw:
+            await message.answer(t(user.language, "withdraw_min", min_withdraw=min_withdraw))
             return
 
         last_q = await session.execute(
@@ -39,11 +40,11 @@ async def cmd_withdraw(message: Message):
         )
         last = last_q.scalar_one_or_none()
         now = datetime.now(timezone.utc)
-        if last and not last.processed and last.requested_at > now - timedelta(hours=WAIT_HOURS):
+        if last and not last.processed and last.requested_at > now - timedelta(hours=wait_hours):
             await message.answer(t(user.language, "withdraw_pending"))
             return
 
-        if user.balance_ton >= MIN_WITHDRAW:
+        if user.balance_ton >= min_withdraw:
             currency = "TON"
             amount = user.balance_ton
             user.balance_ton = 0
@@ -58,4 +59,6 @@ async def cmd_withdraw(message: Message):
         session.add(withdrawal)
         await session.commit()
 
-        await message.answer(t(user.language, "withdraw_requested"))
+        await message.answer(
+            t(user.language, "withdraw_requested", hours=wait_hours)
+        )

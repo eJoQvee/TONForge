@@ -71,3 +71,14 @@ class Invite(Base):
     )
 
     user = relationship("User", back_populates="invites")
+
+
+class Config(Base):
+    __tablename__ = "settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    daily_percent: Mapped[float] = mapped_column(Float, default=0.023)
+    min_deposit: Mapped[float] = mapped_column(Float, default=10)
+    min_withdraw: Mapped[float] = mapped_column(Float, default=50)
+    withdraw_delay_hours: Mapped[int] = mapped_column(Integer, default=24)
+    notification_text: Mapped[str] = mapped_column(String, default="")

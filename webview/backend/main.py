@@ -7,7 +7,6 @@ from uuid import uuid4
 
 from database.db import get_session
 from database import models
-from services.income import DAILY_PERCENT
 from utils.referrals import get_referral_stats
 from bot_config import settings
 from services import deposit as deposit_service
@@ -41,12 +40,14 @@ async def balance(
         raise HTTPException(status_code=404, detail="user_not_found")
     if user.is_blocked:
         raise HTTPException(status_code=403, detail="user_blocked")
+    cfg = await session.get(models.Config, 1)
+    percent = cfg.daily_percent if cfg else 0.023
     deposits = await session.execute(
         select(models.Deposit.amount, models.Deposit.currency).where(
             models.Deposit.user_id == user.id, models.Deposit.is_active
         )
     )
-    daily_income = sum(amount * DAILY_PERCENT for amount, _ in deposits.all())
+    daily_income = sum(amount * percent for amount, _ in deposits.all())
     return {"balance": user.balance_ton, "daily_income": daily_income}
 
 
@@ -104,7 +105,7 @@ async def get_profile(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="user_not_found")
-     if user.is_blocked:
+    if user.is_blocked:
         raise HTTPException(status_code=403, detail="user_blocked")
     stats = await get_referral_stats(session, user.id)
     return {

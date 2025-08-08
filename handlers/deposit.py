@@ -8,8 +8,6 @@ from database import models
 from services import deposit as deposit_service
 from utils.i18n import t
 
-MIN_DEPOSIT = 10  # TON or USDT
-
 router = Router()
 
 
@@ -32,11 +30,12 @@ async def cmd_deposit(message: Message):
         await message.answer("Currency must be TON or USDT")
         return
 
-    if amount < MIN_DEPOSIT:
-        await message.answer(t(lang, "deposit_min"))
-        return
-
     async for session in get_session():
+        cfg = await session.get(models.Config, 1)
+        min_dep = cfg.min_deposit if cfg else 10
+        if amount < min_dep:
+            await message.answer(t(lang, "deposit_min", min_deposit=min_dep))
+            return
         result = await session.execute(
             select(models.User).where(models.User.telegram_id == message.from_user.id)
         )

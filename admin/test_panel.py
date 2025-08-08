@@ -86,16 +86,31 @@ class Withdrawal:
         self.requested_at = requested_at
         self.processed = processed
 
-models = types.SimpleNamespace(Deposit=Deposit, Withdrawal=Withdrawal, User=type("User", (), {}))
+class Config:
+    def __init__(self, daily_percent=0.023, min_deposit=10, min_withdraw=50, delay=24, text=""):
+        self.daily_percent = daily_percent
+        self.min_deposit = min_deposit
+        self.min_withdraw = min_withdraw
+        self.withdraw_delay_hours = delay
+        self.notification_text = text
+
+models = types.SimpleNamespace(
+    Deposit=Deposit,
+    Withdrawal=Withdrawal,
+    User=type("User", (), {}),
+    Config=Config,
+)
 sys.modules["database"] = types.SimpleNamespace(models=models)
 
-from admin.panel import logs, export_transactions
+from admin.panel import logs, export_transactions, get_settings, update_settings
 
 # ---- test helpers ----
 class DummySession:
-    def __init__(self, deposits, withdrawals):
+    def __init__(self, deposits, withdrawals, config=None):
         self._deposits = deposits
         self._withdrawals = withdrawals
+        self._config = config or Config()
+        
     async def execute(self, query):
         text = str(query)
         if "deposits" in text:
@@ -103,6 +118,14 @@ class DummySession:
         if "withdrawals" in text:
             return types.SimpleNamespace(scalars=lambda: types.SimpleNamespace(all=lambda: self._withdrawals))
         return types.SimpleNamespace(scalars=lambda: types.SimpleNamespace(all=lambda: []))
+
+    async def get(self, model, _id):
+        if model is Config:
+            return self._config
+        return None
+
+    async def commit(self):
+        return None
 
 
 def _sample_data():
@@ -130,4 +153,16 @@ def test_export_transactions_csv():
             chunk if isinstance(chunk, bytes) else chunk.encode() for chunk in resp.body_iterator
         )
         assert b"deposit" in body and b"withdrawal" in body
+    asyncio.run(run())
+
+
+def test_settings_roundtrip():
+    cfg = Config(daily_percent=0.02, min_deposit=5)
+    session = DummySession([], [], cfg)
+    async def run():
+        data = await get_settings(session=session)
+        assert data["daily_percent"] == 0.02
+        await update_settings({"daily_percent": 0.05, "min_deposit": 15}, session=session)
+        assert cfg.daily_percent == 0.05
+        assert cfg.min_deposit == 15
     asyncio.run(run())
