@@ -20,12 +20,14 @@ async def check_deposit(label: str, min_amount: float) -> float:
         otherwise ``0.0``.
     """
     
-    headers = (
-        {"Authorization": f"Bearer {settings.ton_api_key}"}
-        if settings.ton_api_key
-        else None
-    )
+    headers: dict | None = None
     params = {"limit": 20}
+    if settings.ton_api_key:
+        headers = {
+            "Authorization": f"Bearer {settings.ton_api_key}",
+            "X-API-Key": settings.ton_api_key,
+        }
+        params["api_key"] = settings.ton_api_key
     url = f"{TON_API_URL}/v2/blockchain/accounts/{settings.ton_wallet}/transactions"
     try:
         data = await fetch_json(
@@ -65,12 +67,19 @@ async def get_transaction_amount(tx_hash: str) -> float:
     Returns:
         Amount in TON as a float. Returns 0.0 on failure.
     """
-    headers = {"Authorization": f"Bearer {settings.ton_api_key}"} if settings.ton_api_key else {}
+    headers = {}
+    params = {}
+    if settings.ton_api_key:
+        headers = {
+            "Authorization": f"Bearer {settings.ton_api_key}",
+            "X-API-Key": settings.ton_api_key,
+        }
+        params["api_key"] = settings.ton_api_key
     url = f"{TON_API_URL}/v2/blockchain/transactions/{tx_hash}"
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(url, headers=headers)
+            resp = await client.get(url, params=params, headers=headers
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPError as exc:
