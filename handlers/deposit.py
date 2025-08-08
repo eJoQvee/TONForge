@@ -7,6 +7,8 @@ from database import models
 from utils.referrals import distribute_referral_income
 from utils.i18n import t
 
+MIN_DEPOSIT = 10  # TON or USDT
+
 router = Router()
 
 
@@ -29,6 +31,10 @@ async def cmd_deposit(message: Message):
         await message.answer("Currency must be TON or USDT")
         return
 
+    if amount < MIN_DEPOSIT:
+        await message.answer(t(lang, "deposit_min"))
+        return
+
     async for session in get_session():
         result = await session.execute(
             select(models.User).where(models.User.telegram_id == message.from_user.id)
@@ -37,7 +43,9 @@ async def cmd_deposit(message: Message):
         if not user:
             await message.answer(t(lang, "not_registered"))
             return
-        deposit = models.Deposit(user_id=user.id, amount=amount, currency=currency)
+        deposit = models.Deposit(
+            user_id=user.id, amount=amount, currency=currency, is_active=True
+        )
         session.add(deposit)
         if currency == "TON":
             user.balance_ton += amount

@@ -6,6 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from bot_config import settings
 from handlers import start, help, profile, withdraw, deposit, referral, panel
 from database.migrate import migrate
+from utils.scheduler import daily_job
 
 bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
@@ -40,7 +41,7 @@ async def main() -> None:
     await migrate()
     # Ensure bot uses long polling by removing any existing webhook
     await bot.delete_webhook(drop_pending_updates=True)
-    await asyncio.gather(start_web(), dp.start_polling(bot))
+    await asyncio.gather(start_web(), dp.start_polling(bot), daily_job())
 
 
 if __name__ == "__main__":

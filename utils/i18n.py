@@ -16,10 +16,14 @@ MESSAGES = {
         "deposit_usage": "Usage: /deposit <amount> <TON|USDT>",
         "deposit_invalid_amount": "Invalid amount",
         "deposit_invalid_currency": "Currency must be TON or USDT",
+        "deposit_min": "Minimum deposit is 10 TON or 10 USDT.",
         "deposit_success": "Deposit added successfully",
         "withdraw_min": "Minimum withdrawal amount is 50 TON or 50 USDT.",
         "withdraw_requested": (
             "Withdrawal request submitted. Please wait up to 24 hours."
+        ),
+        "withdraw_pending": (
+            "You already have a pending withdrawal. Please wait until it is processed."
         ),
         "referral_stats": (
             "Invited: {invited}\n"
@@ -43,10 +47,14 @@ MESSAGES = {
         "deposit_usage": "Использование: /deposit <сумма> <TON|USDT>",
         "deposit_invalid_amount": "Некорректная сумма",
         "deposit_invalid_currency": "Валюта должна быть TON или USDT",
+        "deposit_min": "Минимальный депозит 10 TON или 10 USDT.",
         "deposit_success": "Депозит успешно добавлен",
         "withdraw_min": "Минимальная сумма для вывода 50 TON или 50 USDT.",
         "withdraw_requested": (
             "Заявка на вывод отправлена. Ожидайте обработки в течение 24 часов."
+        ),
+         "withdraw_pending": (
+            "У вас уже есть заявка на вывод. Пожалуйста, дождитесь её обработки."
         ),
         "referral_stats": (
             "Приглашено: {invited}\n"

@@ -1,11 +1,14 @@
 from aiogram import Router, F
 from aiogram.types import Message
 from sqlalchemy import select
+from datetime import datetime, timedelta, timezone
+
 from database.db import get_session
 from database import models
 from utils.i18n import t
 
-MIN_WITHDRAW = 50  # TON или USDT
+MIN_WITHDRAW = 50  # TON or USDT
+WAIT_HOURS = 24
 
 router = Router()
 
@@ -28,5 +31,31 @@ async def cmd_withdraw(message: Message):
             await message.answer(t(user.language, "withdraw_min"))
             return
 
-        # здесь должна быть логика заявки на вывод (подтверждение, запись в БД и пр.)
+        last_q = await session.execute(
+            select(models.Withdrawal)
+            .where(models.Withdrawal.user_id == user.id)
+            .order_by(models.Withdrawal.requested_at.desc())
+            .limit(1)
+        )
+        last = last_q.scalar_one_or_none()
+        now = datetime.now(timezone.utc)
+        if last and not last.processed and last.requested_at > now - timedelta(hours=WAIT_HOURS):
+            await message.answer(t(user.language, "withdraw_pending"))
+            return
+
+        if user.balance_ton >= MIN_WITHDRAW:
+            currency = "TON"
+            amount = user.balance_ton
+            user.balance_ton = 0
+        else:
+            currency = "USDT"
+            amount = user.balance_usdt
+            user.balance_usdt = 0
+
+        withdrawal = models.Withdrawal(
+            user_id=user.id, amount=amount, currency=currency
+        )
+        session.add(withdrawal)
+        await session.commit()
+
         await message.answer(t(user.language, "withdraw_requested"))
