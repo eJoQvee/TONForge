@@ -31,6 +31,7 @@ MESSAGES = {
             "USDT bonus: {bonus_usdt}"
         ),
         "blocked": "Your account is blocked.",
+        "fallback_error": "An unexpected error occurred. Please try again later.",
     },
     "ru": {
         "welcome": "Добро пожаловать в TONForge! Используйте /profile для просмотра профиля.",
@@ -63,6 +64,7 @@ MESSAGES = {
             "Бонус USDT: {bonus_usdt}"
         ),
         "blocked": "Ваш аккаунт заблокирован.",
+        "fallback_error": "Произошла неожиданная ошибка. Пожалуйста, попробуйте позже.",
     },
 }
 

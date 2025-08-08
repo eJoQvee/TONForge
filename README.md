@@ -52,3 +52,12 @@ Telegram-based investment bot MVP.
     ```
 
 Running `python main.py` requires network access to Telegram servers.
+
+## Tests
+
+Install dependencies and run the test suite:
+
+```bash
+pip install -r requirements.txt
+pytest
+```

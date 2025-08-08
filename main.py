@@ -4,7 +4,7 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from bot_config import settings
-from handlers import start, help, profile, withdraw, deposit, referral, panel
+from handlers import start, help, profile, withdraw, deposit, referral, panel, errors
 from database.migrate import migrate
 from utils.scheduler import daily_job, deposit_job
 
@@ -18,6 +18,7 @@ dp.include_router(withdraw.router)
 dp.include_router(deposit.router)
 dp.include_router(referral.router)
 dp.include_router(panel.router)
+dp.include_router(errors.router)
 
 
 async def handle(_request: web.Request) -> web.Response:
