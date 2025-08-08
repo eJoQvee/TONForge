@@ -16,6 +16,14 @@ async def migrate() -> None:
         if not await conn.run_sync(has_is_blocked_column):
             await conn.execute(text("ALTER TABLE users ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE"))
 
+        def has_last_ip_column(sync_conn):
+            inspector = inspect(sync_conn)
+            columns = [col["name"] for col in inspector.get_columns("users")]
+            return "last_ip" in columns
+
+        if not await conn.run_sync(has_last_ip_column):
+            await conn.execute(text("ALTER TABLE users ADD COLUMN last_ip VARCHAR"))
+
         # ensure settings row exists
         count = await conn.scalar(text("SELECT COUNT(*) FROM settings"))
         if count == 0:

@@ -9,11 +9,11 @@ MESSAGES = {
         "help": (
             "/start - register\n"
             "/profile - profile and balance\n"
-            "/deposit <amount> <TON|USDT> - deposit funds\n"
+            "/deposit &lt;amount&gt; &lt;TON|USDT&gt; - deposit funds\n"
             "/withdraw - withdraw funds\n"
             "/referrals - referral stats"
         ),
-        "deposit_usage": "Usage: /deposit <amount> <TON|USDT>",
+        "deposit_usage": "Usage: /deposit &lt;amount&gt; &lt;TON|USDT&gt;",
         "deposit_invalid_amount": "Invalid amount",
         "deposit_invalid_currency": "Currency must be TON or USDT",
         "deposit_min": "Minimum deposit is {min_deposit} TON or {min_deposit} USDT.",
@@ -47,11 +47,11 @@ MESSAGES = {
         "help": (
             "/start - регистрация\n"
             "/profile - профиль и баланс\n"
-            "/deposit <сумма> <TON|USDT> - пополнить\n"
+            "/deposit &lt;сумма&gt; &lt;TON|USDT&gt; - пополнить\n"
             "/withdraw - вывести средства\n"
             "/referrals - партнёрская статистика"
         ),
-        "deposit_usage": "Использование: /deposit <сумма> <TON|USDT>",
+        "deposit_usage": "Использование: /deposit &lt;сумма&gt; &lt;TON|USDT&gt;",,
         "deposit_invalid_amount": "Некорректная сумма",
         "deposit_invalid_currency": "Валюта должна быть TON или USDT",
         "deposit_min": "Минимальный депозит {min_deposit} TON или {min_deposit} USDT.",
