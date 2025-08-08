@@ -26,11 +26,15 @@ async def check_deposit(label: str, min_amount: float) -> float:
         else None
     )
     params = {"comments": label, "limit": 20}
-    data = await fetch_json(
-        f"{TON_API_URL}/v2/blockchain/transactions",
-        params=params,
-        headers=headers,
-    )
+    try:
+        data = await fetch_json(
+            f"{TON_API_URL}/v2/blockchain/transactions",
+            params=params,
+            headers=headers,
+        )
+    except httpx.HTTPError as exc:
+        logger.error("Failed to fetch TON transactions: %s", exc)
+        return 0.0
     
     transactions = data.get("transactions") or []
     for tx in transactions:
