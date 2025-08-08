@@ -1,6 +1,23 @@
 services:
   - type: web
-    name: tonforge
+     name: tonforge-web
+    env: python
+    plan: free
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: python web_server.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.11
+      - key: DATABASE_URL
+        value: ${DATABASE_URL}
+      - key: TON_API_KEY
+        value: ${TON_API_KEY}
+      - key: OTHER_SECRET
+        value: ${OTHER_SECRET}
+  - type: worker
+    name: tonforge-worker
     env: python
     plan: free
     buildCommand: |

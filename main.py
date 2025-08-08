@@ -1,12 +1,20 @@
 import asyncio
 import logging
-import os
 import signal
-from aiohttp import web
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from bot_config import settings
-from handlers import start, help, profile, withdraw, deposit, referral, panel, errors
+from handlers import (
+    start,
+    help,
+    profile,
+    withdraw,
+    deposit,
+    referral,
+    panel,
+    errors,
+)
 from database.migrate import migrate
 from database.db import engine
 from utils.scheduler import daily_job, deposit_job
@@ -25,30 +33,7 @@ dp.include_router(panel.router)
 dp.include_router(errors.router)
 
 
-async def handle(_request: web.Request) -> web.Response:
-    """Simple health endpoint for Render."""
-    return web.Response(text="OK")
-
-
-async def start_web() -> None:
-    """Start a minimal web server so Render detects an open port."""
-    app = web.Application()
-    app.router.add_get("/", handle)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get("PORT", 8000))
-    try:
-        site = web.TCPSite(runner, "0.0.0.0", port)
-        await site.start()
-    except OSError as exc:
-        logger.exception("Failed to bind web server to port %s", port)
-        raise
-    else:
-        logger.info("Web server started on port %s", port)
-
-
 async def main() -> None:
-    await start_web()
     # Ensure database tables exist before starting
     await migrate()
     # Ensure bot uses long polling by removing any existing webhook
@@ -64,7 +49,6 @@ async def main() -> None:
         loop.add_signal_handler(sig, _signal_handler)
 
     tasks = [
-        asyncio.create_task(start_web()),
         asyncio.create_task(dp.start_polling(bot)),
         asyncio.create_task(daily_job()),
         asyncio.create_task(deposit_job(bot)),

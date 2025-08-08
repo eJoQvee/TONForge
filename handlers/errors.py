@@ -1,14 +1,17 @@
+import logging
+
 from aiogram import Router
 from aiogram.types import ErrorEvent
 from aiogram.exceptions import TelegramBadRequest
-import logging
+from aiogram.types import ErrorEvent
+
 from utils.i18n import t
 
 router = Router()
 
 
 @router.errors()
-async def global_error_handler(event: ErrorEvent) -> bool:
+async def global_error_handler(event: ErrorEvent) -> None:
     """Send fallback message to user on unexpected errors."""
     update = event.update
     exception = event.exception
