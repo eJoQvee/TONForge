@@ -1,13 +1,30 @@
 import asyncio
-import httpx
+import sys
+import types
 import pytest
 from services import ton
 
 
+class DummyHTTPError(Exception):
+    pass
+
+
+class DummyHTTPStatusError(DummyHTTPError):
+    pass
+
+
+dummy_httpx = types.SimpleNamespace(
+    HTTPError=DummyHTTPError,
+    HTTPStatusError=DummyHTTPStatusError,
+)
+sys.modules["httpx"] = dummy_httpx
+sys.modules["dotenv"] = types.SimpleNamespace(load_dotenv=lambda: None)
+sys.modules["bot_config"] = types.SimpleNamespace(
+    settings=types.SimpleNamespace(ton_api_key=None, ton_wallet="wallet")
+)
+
 async def _raise_http_error(*args, **kwargs):
-    request = httpx.Request("GET", "http://example.com")
-    response = httpx.Response(status_code=404, request=request)
-    raise httpx.HTTPStatusError("not found", request=request, response=response)
+    raise DummyHTTPStatusError()
 
 
 def test_check_deposit_http_error(monkeypatch):

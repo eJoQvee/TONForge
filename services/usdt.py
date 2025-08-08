@@ -34,11 +34,15 @@ async def check_deposit(address: str, label: str, min_amount: float) -> float:
         if settings.tron_api_key
         else None
     )
-    data = await fetch_json(
-        f"{TRON_API_URL}/v1/accounts/{address}/transactions/trc20",
-        params=params,
-        headers=headers,
-    )
+    try:
+        data = await fetch_json(
+            f"{TRON_API_URL}/v1/accounts/{address}/transactions/trc20",
+            params=params,
+            headers=headers,
+        )
+    except httpx.HTTPError as exc:
+        logger.error("Failed to fetch TRON transactions: %s", exc)
+        return 0.0
     
     transactions = data.get("data") or []
     for tx in transactions:
