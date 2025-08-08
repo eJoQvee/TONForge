@@ -28,6 +28,8 @@ class Settings(BaseModel):
     bot_token: str = Field(default_factory=lambda: _require_env("BOT_TOKEN"))
     ton_api_key: str | None = os.getenv("TON_API_KEY")
     tron_api_key: str | None = os.getenv("TRON_API_KEY")
+    ton_wallet: str = Field(default_factory=lambda: _require_env("TON_WALLET"))
+    usdt_wallet: str = Field(default_factory=lambda: _require_env("USDT_WALLET"))
     database_url: str = Field(default_factory=lambda: _require_env("DATABASE_URL"))
     redis_url: str | None = os.getenv("REDIS_URL")
     admin_password: str = Field(default_factory=lambda: _require_env("ADMIN_PASSWORD"))

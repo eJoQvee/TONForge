@@ -41,7 +41,12 @@ async def main() -> None:
     await migrate()
     # Ensure bot uses long polling by removing any existing webhook
     await bot.delete_webhook(drop_pending_updates=True)
-    await asyncio.gather(start_web(), dp.start_polling(bot), daily_job())
+    await asyncio.gather(
+        start_web(),
+        dp.start_polling(bot),
+        daily_job(),
+        deposit_job(bot),
+    )
 
 
 if __name__ == "__main__":

@@ -43,16 +43,19 @@ async def cmd_deposit(message: Message):
         if not user:
             await message.answer(t(lang, "not_registered"))
             return
-        deposit = models.Deposit(
-            user_id=user.id, amount=amount, currency=currency, is_active=True
+        address = settings.ton_wallet if currency == "TON" else settings.usdt_wallet
+        dep = await deposit_service.create_deposit(
+            session, user.id, amount, currency, address if currency == "USDT" else None
         )
-        session.add(deposit)
-        if currency == "TON":
-            user.balance_ton += amount
-        else:
-            user.balance_usdt += amount
-        await distribute_referral_income(session, user.id, amount, currency)
-        await session.commit()
 
-    await message.answer(t(user.language, "deposit_success"))
+    await message.answer(
+        t(
+            user.language,
+            "deposit_address",
+            amount=amount,
+            currency=currency,
+            address=address,
+            label=dep.id,
+        )
+    )
     

@@ -9,6 +9,8 @@ from database.db import get_session
 from database import models
 from services.income import DAILY_PERCENT
 from utils.referrals import get_referral_stats
+from bot_config import settings
+from services import deposit as deposit_service
 
 app = FastAPI()
 router = APIRouter(prefix="/api")
@@ -52,9 +54,22 @@ class GenerateLabelRequest(BaseModel):
 
 
 @router.post("/generate_label")
-async def generate_label(data: GenerateLabelRequest) -> dict:
-    label = f"{data.user_id}-{uuid4().hex}"
-    address = "TON_WALLET" if data.method.upper() == "TON" else "USDT_WALLET"
+async def generate_label(
+    data: GenerateLabelRequest, session: AsyncSession = Depends(get_session)
+) -> dict:
+    result = await session.execute(
+        select(models.User).where(models.User.telegram_id == data.user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    method = data.method.upper()
+    address = settings.ton_wallet if method == "TON" else settings.usdt_wallet
+    dep = await deposit_service.create_deposit(
+        session, user.id, data.amount, method, address if method == "USDT" else None
+    )
+    label = str(dep.id)
     return {"address": address, "label": label}
 
 

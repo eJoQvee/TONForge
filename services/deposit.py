@@ -1,5 +1,6 @@
 from database import models
 from services import ton, usdt
+from utils.referrals import distribute_referral_income
 
 
 async def create_deposit(
@@ -66,6 +67,7 @@ async def check_deposit_status(session, deposit_id: int) -> bool:
             user.balance_ton += deposit.amount
         else:
             user.balance_usdt += deposit.amount
+        await distribute_referral_income(session, user.id, deposit.amount, deposit.currency)
         await session.commit()
         return True
 
