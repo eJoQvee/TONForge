@@ -29,7 +29,6 @@ async def check_deposit(label: str, min_amount: float) -> float:
     url = f"{TON_API_URL}/v2/blockchain/accounts/{settings.ton_wallet}/transactions"
     try:
         data = await fetch_json(
-            ,
             url,
             params=params,
             headers=headers,
