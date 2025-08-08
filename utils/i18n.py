@@ -51,7 +51,7 @@ MESSAGES = {
             "/withdraw - вывести средства\n"
             "/referrals - партнёрская статистика"
         ),
-        "deposit_usage": "Использование: /deposit &lt;сумма&gt; &lt;TON|USDT&gt;",,
+        "deposit_usage": "Использование: /deposit &lt;сумма&gt; &lt;TON|USDT&gt;",
         "deposit_invalid_amount": "Некорректная сумма",
         "deposit_invalid_currency": "Валюта должна быть TON или USDT",
         "deposit_min": "Минимальный депозит {min_deposit} TON или {min_deposit} USDT.",
