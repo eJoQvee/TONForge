@@ -7,6 +7,7 @@ from database.db import get_session
 from database import models
 from services import deposit as deposit_service
 from utils.i18n import t
+from utils.notify import notify_channel
 
 router = Router()
 
@@ -59,3 +60,13 @@ async def cmd_deposit(message: Message):
         )
     )
     
+    await notify_channel(
+        message.bot,
+        t(
+            "en",
+            "notify_deposit",
+            user_id=message.from_user.id,
+            amount=amount,
+            currency=currency,
+        ),
+    )

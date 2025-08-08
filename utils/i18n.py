@@ -18,6 +18,9 @@ MESSAGES = {
         "deposit_invalid_currency": "Currency must be TON or USDT",
         "deposit_min": "Minimum deposit is {min_deposit} TON or {min_deposit} USDT.",
         "deposit_success": "Deposit added successfully",
+        "deposit_address": (
+            "Please transfer {amount} {currency} to {address} with comment {label}."
+        ),
         "withdraw_min": "Minimum withdrawal amount is {min_withdraw} TON or {min_withdraw} USDT.",
         "withdraw_requested": (
             "Withdrawal request submitted. Please wait up to {hours} hours."
@@ -32,6 +35,8 @@ MESSAGES = {
         ),
         "blocked": "Your account is blocked.",
         "fallback_error": "An unexpected error occurred. Please try again later.",
+        "notify_deposit": "New deposit: {amount} {currency} from user {user_id}",
+        "notify_withdraw": "Withdrawal requested: {amount} {currency} from user {user_id}",
     },
     "ru": {
         "welcome": "Добро пожаловать в TONForge! Используйте /profile для просмотра профиля.",
@@ -51,6 +56,9 @@ MESSAGES = {
         "deposit_invalid_currency": "Валюта должна быть TON или USDT",
         "deposit_min": "Минимальный депозит {min_deposit} TON или {min_deposit} USDT.",
         "deposit_success": "Депозит успешно добавлен",
+        "deposit_address": (
+            "Переведите {amount} {currency} на {address} с комментарием {label}."
+        ),
         "withdraw_min": "Минимальная сумма для вывода {min_withdraw} TON или {min_withdraw} USDT.",
         "withdraw_requested": (
             "Заявка на вывод отправлена. Ожидайте обработки в течение {hours} часов."
@@ -65,6 +73,8 @@ MESSAGES = {
         ),
         "blocked": "Ваш аккаунт заблокирован.",
         "fallback_error": "Произошла неожиданная ошибка. Пожалуйста, попробуйте позже.",
+        "notify_deposit": "Новый депозит: {amount} {currency} от пользователя {user_id}",
+        "notify_withdraw": "Запрошен вывод: {amount} {currency} от пользователя {user_id}",
     },
 }
 

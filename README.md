@@ -13,6 +13,7 @@ Telegram-based investment bot MVP.
 
 2. Copy `.env.example` to `.env` and fill in required values. The `TELEPORT_API_URL`
    is available in the Teleport dashboard: https://teleport.org/dashboard.
+   Set `CHANNEL_ID` to enable channel notifications (optional).
 3. Start PostgreSQL and Redis using Docker:
 
    ```bash

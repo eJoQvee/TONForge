@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from database.db import get_session
 from database import models
 from utils.i18n import t
+from utils.notify import notify_channel
 
 router = Router()
 
@@ -61,4 +62,14 @@ async def cmd_withdraw(message: Message):
 
         await message.answer(
             t(user.language, "withdraw_requested", hours=wait_hours)
+        )
+        await notify_channel(
+            message.bot,
+            t(
+                "en",
+                "notify_withdraw",
+                user_id=message.from_user.id,
+                amount=amount,
+                currency=currency,
+            ),
         )
