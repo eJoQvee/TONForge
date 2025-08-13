@@ -2,7 +2,6 @@ import asyncio
 import sys
 import types
 import pytest
-from services import ton
 
 
 class DummyHTTPError(Exception):
@@ -22,6 +21,8 @@ sys.modules["dotenv"] = types.SimpleNamespace(load_dotenv=lambda: None)
 sys.modules["bot_config"] = types.SimpleNamespace(
     settings=types.SimpleNamespace(ton_api_key=None, ton_wallet="wallet")
 )
+
+from services import ton
 
 async def _raise_http_error(*args, **kwargs):
     raise DummyHTTPStatusError()

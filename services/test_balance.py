@@ -1,7 +1,9 @@
 import asyncio
 import pathlib
 import sys
+import pytest
 
+pytest.importorskip("sqlalchemy.ext.asyncio")
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
