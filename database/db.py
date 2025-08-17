@@ -1,47 +1,70 @@
 import os
-from pathlib import Path
-from urllib.parse import urlparse
+from typing import AsyncGenerator
+from contextlib import asynccontextmanager
 
-from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase
 
-# Загружаем .env из корня репо
-ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(ROOT / ".env")
+# === 0) ENV ===
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. "
+        "On Render: use the External Connection string from your Postgres."
+    )
 
-Base = declarative_base()
+# === 1) Base ===
+class Base(DeclarativeBase):
+    pass
 
-def to_asyncpg_url(url: str) -> str:
-    if not url:
-        raise RuntimeError("DATABASE_URL is not set")
-    # postgres:// -> postgresql://
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
-    # добавим +asyncpg если отсутствует
-    if url.startswith("postgresql://") and "+asyncpg://" not in url:
-        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    return url
-
-def is_remote(url: str) -> bool:
-    host = urlparse(url).hostname or ""
-    return host not in ("localhost", "127.0.0.1")
-
-RAW_DB_URL = os.getenv("DATABASE_URL", "")
-ASYNC_DB_URL = to_asyncpg_url(RAW_DB_URL)
-
-# Определяем SSL: asyncpg не понимает 'sslmode' через SQLAlchemy URL, надо передавать 'ssl' в connect_args
-# DB_SSL: "auto" (по умолчанию), "true", "false"
-DB_SSL = (os.getenv("DB_SSL", "auto") or "auto").lower()
-use_ssl = (DB_SSL == "true") or (DB_SSL == "auto" and is_remote(RAW_DB_URL))
-
-connect_args = {"ssl": True} if use_ssl else {}
-
-engine = create_async_engine(
-    ASYNC_DB_URL,
+# === 2) Engine ===
+# Параметры стабильные для Render: pre_ping + recycle
+engine: AsyncEngine = create_async_engine(
+    DATABASE_URL,
     echo=False,
+    future=True,
     pool_pre_ping=True,
-    connect_args=connect_args,  # ключевое для SSL
+    pool_recycle=1800,
 )
 
-SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+# === 3) Session factory ===
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    expire_on_commit=False,
+    class_=AsyncSession,
+)
+
+# Бэк-совместимое имя, если где-то уже используется
+async_session = AsyncSessionLocal
+
+# === 4) Две удобные формы доступа к сессии ===
+
+# 4.1 Контекстный менеджер (удобен в aiogram): 
+@asynccontextmanager
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Использование:
+        async with get_session() as session:
+            await session.execute(...)
+    """
+    session: AsyncSession = AsyncSessionLocal()
+    try:
+        yield session
+        # commit на твоё усмотрение, чаще делаем явный commit в бизнес-логике
+    finally:
+        await session.close()
+
+# 4.2 Генератор (подходит для FastAPI Depends, джобов и т.п.)
+async def session_generator() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Использование (FastAPI):
+        async def endpoint(session: AsyncSession = Depends(session_generator)):
+            ...
+    """
+    async with get_session() as session:
+        yield session
