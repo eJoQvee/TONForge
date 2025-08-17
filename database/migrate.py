@@ -1,39 +1,18 @@
+# database/migrate.py
 import asyncio
-from sqlalchemy import inspect, text
-from database.db import engine
-from database import models
 
+# импорт моделей, чтобы зарегистрировать таблицы
+try:
+    from database import models as _models  # noqa: F401
+except Exception:
+    pass
 
-async def migrate() -> None:
+from database.db import engine, Base
+
+async def run():
     async with engine.begin() as conn:
-        await conn.run_sync(models.Base.metadata.create_all)
-
-        def has_is_blocked_column(sync_conn):
-            inspector = inspect(sync_conn)
-            columns = [col["name"] for col in inspector.get_columns("users")]
-            return "is_blocked" in columns
-
-        if not await conn.run_sync(has_is_blocked_column):
-            await conn.execute(text("ALTER TABLE users ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE"))
-
-        def has_last_ip_column(sync_conn):
-            inspector = inspect(sync_conn)
-            columns = [col["name"] for col in inspector.get_columns("users")]
-            return "last_ip" in columns
-
-        if not await conn.run_sync(has_last_ip_column):
-            await conn.execute(text("ALTER TABLE users ADD COLUMN last_ip VARCHAR"))
-
-        # ensure settings row exists
-        count = await conn.scalar(text("SELECT COUNT(*) FROM settings"))
-        if count == 0:
-            await conn.execute(
-                text(
-                    "INSERT INTO settings (id, daily_percent, min_deposit, min_withdraw, withdraw_delay_hours, notification_text)"
-                    " VALUES (1, 0.023, 10, 50, 24, '')"
-                )
-            )
-
+        await conn.run_sync(Base.metadata.create_all)
+    await engine.dispose()
 
 if __name__ == "__main__":
-    asyncio.run(migrate())
+    asyncio.run(run())
