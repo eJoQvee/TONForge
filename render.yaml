@@ -6,8 +6,8 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
-    preDeployCommand: python -m database.migrate
-    startCommand: uvicorn webview.backend.main:app --host 0.0.0.0 --port $PORT
+    # миграции -> затем запуск uvicorn
+    startCommand: bash -lc "python -m database.migrate && uvicorn webview.backend.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.11
@@ -25,6 +25,7 @@ services:
       - key: OTHER_SECRET
         sync: false
 
+  # worker на Free недоступен — нужен хотя бы Starter
   - type: worker
     runtime: python
     name: tonforge-worker
@@ -55,7 +56,6 @@ services:
   - type: keyvalue
     name: tonforge-kv
     plan: free
-    ipAllowList: []  # только внутренние подключения
 
 databases:
   - name: tonforge-db
