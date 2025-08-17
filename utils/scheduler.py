@@ -3,7 +3,6 @@ from aiogram import Bot
 from sqlalchemy import select
 
 from services.income import accrue_daily_income
-from services.income import accrue_daily_income
 from services import deposit as deposit_service
 from database.db import get_session
 from database import models

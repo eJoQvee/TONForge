@@ -1,6 +1,6 @@
 from database import models
-from services import ton, usdt
 from utils.referrals import distribute_referral_income
+from . import ton, usdt
 
 
 async def create_deposit(

@@ -24,7 +24,6 @@ def test_deposit_with_address():
             session.add(user)
             await session.flush()
             dep = models.Deposit(user_id=user.id, amount=10, currency="USDT", address="ADDR")
-            )
             session.add(dep)
             await session.commit()
             assert dep.address == "ADDR"
