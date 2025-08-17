@@ -10,11 +10,11 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false
-      - key: TELEGRAM_TOKEN
+      - key: BOT_TOKEN
         sync: false
-      - key: TONAPI_KEY
+      - key: TON_API_KEY
         sync: false
-      - key: TON_RECEIVER_WALLET
+      - key: TON_WALLET
         sync: false
       - key: BASE_WEBAPP_URL
         sync: false
