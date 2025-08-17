@@ -1,1 +1,2 @@
-"""Database models and sessions package."""
+# database/__init__.py
+# intentionally empty
