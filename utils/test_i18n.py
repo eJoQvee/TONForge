@@ -7,7 +7,7 @@ def test_fallback_error_translations():
 
 
 def test_notify_translations():
-     placeholders = {
+    placeholders = {
         "deposit_address": dict(amount=1, currency="TON", address="addr", label="lbl"),
         "notify_deposit": dict(amount=1, currency="TON", user_id=1),
         "notify_withdraw": dict(amount=1, currency="TON", user_id=1),
