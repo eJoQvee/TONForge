@@ -1,59 +1,47 @@
 services:
   - type: web
-    runtime: python
     name: tonforge-web
-    plan: free
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-    # Миграция перед стартом (preDeploy недоступен на Free)
-    startCommand: bash -lc "python -m database.migrate && uvicorn webview.backend.main:app --host 0.0.0.0 --port $PORT"
+    env: python
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: python -m database.migrate
+    startCommand: uvicorn webview.backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.11
+      - key: ENV
+        value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: tonforge-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: tonforge-kv
-          property: connectionString
-      - key: TON_API_KEY
         sync: false
-      - key: OTHER_SECRET
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: TONAPI_KEY
+        sync: false
+      - key: TON_RECEIVER_WALLET
+        sync: false
+      - key: BASE_WEBAPP_URL
         sync: false
 
   - type: worker
-    runtime: python
-    name: tonforge-worker
-    plan: starter
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
+    name: tonforge-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
     startCommand: python -m main
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.11
-      - key: BOT_TOKEN
-        sync: false
       - key: DATABASE_URL
-        fromDatabase:
-          name: tonforge-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: tonforge-kv
-          property: connectionString
-      - key: TON_API_KEY
         sync: false
-      - key: OTHER_SECRET
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: ENABLE_SCHEDULER
+        value: "0"
+      - key: TONAPI_KEY
+        sync: false
+      - key: TON_RECEIVER_WALLET
         sync: false
 
-  - type: keyvalue
-    name: tonforge-kv
+cronJobs:
+  - name: daily-accruals
+    schedule: "0 1 * * *"  # ежедневно 01:00 UTC
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m jobs.accrualse: tonforge-kv
     plan: free
     ipAllowList: []                 # только внутренние подключения Render
     maxmemoryPolicy: noeviction

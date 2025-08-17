@@ -37,3 +37,5 @@ fastapi==0.111.0
 redis==5.0.1
 uvicorn==0.30.6
 pytest==8.3.2
+psycopg>=3.2 ; platform_system == "Darwin"
+psycopg[binary]>=3.2 ; platform_system != "Darwin"

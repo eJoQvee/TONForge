@@ -10,19 +10,15 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-# === ENV ===
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError(
-        "DATABASE_URL is not set. On Render: use the External connection string "
-        "from your managed Postgres."
+        "DATABASE_URL is not set. Use the External connection string from your managed Postgres."
     )
 
-# === Base ===
 class Base(DeclarativeBase):
     pass
 
-# === Engine ===
 engine: AsyncEngine = create_async_engine(
     DATABASE_URL,
     echo=False,
@@ -31,25 +27,17 @@ engine: AsyncEngine = create_async_engine(
     pool_recycle=1800,
 )
 
-# === Session factory ===
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     expire_on_commit=False,
     class_=AsyncSession,
 )
 
-# alias, если где-то уже используется
+# alias для совместимости со старым кодом
 async_session = AsyncSessionLocal
-
-# === Доступ к сессии ===
 
 @asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Использование:
-        async with get_session() as session:
-            ...
-    """
     session: AsyncSession = AsyncSessionLocal()
     try:
         yield session
@@ -57,8 +45,5 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         await session.close()
 
 async def session_generator() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Для FastAPI: Depends(session_generator)
-    """
     async with get_session() as session:
         yield session

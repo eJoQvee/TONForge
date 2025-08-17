@@ -5,11 +5,11 @@ from database.db import engine, Base
 
 def _import_models():
     """
-    Импортируем все модели, чтобы Base.metadata их увидела.
-    Подстрой список под свои файлы, если нужно. Пробуем мягко.
+    Импортируй ВСЕ свои модели, чтобы Base.metadata их увидела.
+    Подстрой список под свой проект, если у тебя иные файлы.
     """
     candidates = (
-        "database.models",              # общий сборщик, если есть
+        "database.models",              # если есть сборщик
         "database.models.user",
         "database.models.deposit",
         "database.models.transaction",
@@ -19,7 +19,7 @@ def _import_models():
         try:
             import_module(mod)
         except Exception:
-            pass  # модуль может отсутствовать — ок
+            pass
 
 async def _run_async():
     _import_models()
@@ -28,8 +28,7 @@ async def _run_async():
 
 def migrate():
     """
-    Обёртка: можно импортировать и вызывать из кода, если нужно.
-    Если цикл событий уже идёт — вернёт Task.
+    Можно вызывать импортом: from database.migrate import migrate
     """
     try:
         asyncio.get_running_loop()
