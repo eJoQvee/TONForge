@@ -1,15 +1,16 @@
 services:
+  # -------- WEB (FastAPI) --------
   - type: web
     name: tonforge-web
     runtime: python
     healthCheckPath: /healthz
     buildCommand: pip install -r requirements.txt
-    preDeployCommand: python -m database.migrate
-    startCommand: uvicorn webview.backend.main:app --host 0.0.0.0 --port $PORT
+    # На бесплатном плане надёжнее гонять миграции в startCommand
+    startCommand: python -m database.migrate && uvicorn webview.backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ENV
         value: production
-      - key: DATABASE_URL
+      - key: DATABASE_URL          # postgresql+asyncpg://.../tonforge?sslmode=require
         sync: false
       - key: BASE_WEBAPP_URL
         value: https://tonforge-web.onrender.com
@@ -17,9 +18,14 @@ services:
         sync: false
       - key: TON_WALLET
         sync: false
-      - key: REDIS_URL
+      - key: REDIS_URL             # если будешь подключать KV через URL
+        sync: false
+      - key: ADMIN_PASSWORD        # для админки FastAPI (если используешь)
+        sync: false
+      - key: CHANNEL_ID            # для уведомлений (например, @your_notifications_channel)
         sync: false
 
+  # -------- WORKER (бот) --------
   - type: worker
     name: tonforge-worker
     runtime: python
@@ -32,29 +38,61 @@ services:
         sync: false
       - key: BOT_TOKEN
         sync: false
+      - key: BASE_WEBAPP_URL       # чтобы кнопка "Открыть приложение" в боте вела на живой домен
+        value: https://tonforge-web.onrender.com
       - key: TON_API_KEY
         sync: false
       - key: TON_WALLET
         sync: false
       - key: REDIS_URL
         sync: false
-      - key: ENABLE_SCHEDULER
+      - key: ENABLE_SCHEDULER      # оставь "0", если ежедневные начисления крутятся через cron
         value: "0"
+      - key: CHANNEL_ID
+        sync: false
 
-  # Cron-джоба — это ТОЖЕ сервис (type: cron), не корневой cronJobs:
+  # -------- CRON: сканер депозитов (TON/TRC20) --------
+  - type: cron
+    name: scan-deposits
+    runtime: python
+    schedule: "*/2 * * * *"        # каждые 2 минуты
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m jobs.deposit_scan
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: TON_API_KEY
+        sync: false
+      - key: TON_WALLET
+        sync: false
+      - key: TRON_API_KEY
+        sync: false
+      - key: USDT_WALLET
+        sync: false
+      - key: SCAN_WINDOW_MIN       # глубина окна сканирования в минутах
+        value: "10"
+
+  # -------- CRON: ежедневные начисления --------
   - type: cron
     name: daily-accruals
     runtime: python
-    schedule: "0 1 * * *"               # ежедневно 01:00 UTC
+    schedule: "0 1 * * *"          # каждый день 01:00 UTC
     buildCommand: pip install -r requirements.txt
     startCommand: python -m jobs.accruals
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
 
-  # Redis/KeyValue объявляется как отдельный сервис типа keyvalue
+  # -------- Key-Value (Valkey/Redis совместимое) --------
   - type: keyvalue
     name: tonforge-kv
     plan: free
     maxmemoryPolicy: noeviction
-    ipAllowList: []                      # доступ только изнутри Render
+    ipAllowList: []                 # доступ только изнутри Render
 
 databases:
   - name: tonforge-db
