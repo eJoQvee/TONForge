@@ -100,7 +100,7 @@ async def scan_ton(session: AsyncSession) -> None:
     since = datetime.now(timezone.utc) - timedelta(minutes=SCAN_WINDOW_MIN)
 
     # TonAPI пример; при необходимости подкорректируй путь/поля
-    url = f"https://tonapi.io/v2/accounts/{TON_WALLET}/transactions?limit=100"  # входящие транзакции
+    url = f"https://tonapi.io/v2/blockchain/{TON_WALLET}/transactions?limit=100"  # входящие транзакции
     headers = {"Authorization": f"Bearer {TON_API_KEY}"}
 
     async with httpx.AsyncClient(timeout=20) as client:
@@ -163,7 +163,7 @@ async def scan_tron(session: AsyncSession) -> None:
     since = datetime.now(timezone.utc) - timedelta(minutes=SCAN_WINDOW_MIN)
 
     # TronGrid пример: последние входящие TRC20 на адрес
-    url = f"https://api.trongrid.io/v1/accounts/{USDT_WALLET}/transactions/trc20?limit=100&only_to=true"
+    url = f"https://api.trongrid.io/v1/blockchain/{USDT_WALLET}/transactions/trc20?limit=100&only_to=true"
     headers = {"TRON-PRO-API-KEY": TRON_API_KEY}
 
     async with httpx.AsyncClient(timeout=20) as client:
