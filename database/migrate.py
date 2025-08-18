@@ -1,7 +1,9 @@
 import asyncio
+from sqlalchemy import inspect, text
 from importlib import import_module
 
 from database.db import engine, Base
+from database import models
 
 def _import_models():
     """
