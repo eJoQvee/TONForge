@@ -1,11 +1,14 @@
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
-from uuid import uuid4
 
-from database.db import get_session
+# ВАЖНО: для FastAPI нужен генератор-зависимость, а не asynccontextmanager.
+# Если в database/db.py есть session_generator — используем его алиасом как get_session.
+from database.db import session_generator as get_session
+
 from database import models
 from utils.referrals import get_referral_stats
 from utils.antifraud import check_and_update_ip
@@ -13,20 +16,51 @@ from bot_config import settings
 from services import deposit as deposit_service
 from admin.panel import router as admin_router
 
-app = FastAPI()
-router = APIRouter(prefix="/api")
+app = FastAPI(title="TONForge Web", version="1.0.0")
+
+# CORS — оставляем, потом сузишь домены под прод
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # adjust for production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------- Верхнеуровневые служебные эндпоинты ----------
+
+@app.get("/healthz", include_in_schema=False)
+async def healthz() -> dict:
+    """Health-check для Render."""
+    return {"ok": True}
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def index():
+    """Простая страница на корне (чтобы не было 404 на /)."""
+    return """
+    <!doctype html>
+    <html lang="en">
+      <head><meta charset="utf-8"><title>TONForge Web</title></head>
+      <body style="font-family:ui-sans-serif,system-ui;margin:24px;line-height:1.5">
+        <h1>TONForge Web</h1>
+        <p>Backend is running.</p>
+        <ul>
+          <li>Status: <a href="/healthz">/healthz</a></li>
+          <li>API: <a href="/api/health">/api/health</a></li>
+          <li>Docs: <a href="/docs">/docs</a></li>
+        </ul>
+      </body>
+    </html>
+    """
+
+# ---------- API (под префиксом /api) ----------
+
+router = APIRouter(prefix="/api")
 
 
 async def _fetch_user(
     session: AsyncSession, telegram_id: int, request: Request | None = None
 ) -> models.User:
-    """Return user by telegram_id and perform IP check."""
+    """Вернуть пользователя по telegram_id + базовый антифрод и блокировки."""
     result = await session.execute(
         select(models.User).where(models.User.telegram_id == telegram_id)
     )
@@ -35,14 +69,14 @@ async def _fetch_user(
         raise HTTPException(status_code=404, detail="user_not_found")
     if request:
         await check_and_update_ip(session, user, request.client.host)
-    if user.is_blocked:
+    if getattr(user, "is_blocked", False):
         raise HTTPException(status_code=403, detail="user_blocked")
     return user
 
 
 @router.get("/health")
 async def health() -> dict:
-    """Simple health check endpoint."""
+    """Простой сервисный эндпоинт (внутри /api)."""
     return {"status": "ok"}
 
 
@@ -114,7 +148,7 @@ async def get_profile(
 async def operations(
     user_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
-    """Return deposit and withdrawal history for the user."""
+    """История депозитов/выводов пользователя."""
     user = await _fetch_user(session, user_id, request)
 
     deposits = await session.execute(
@@ -145,14 +179,14 @@ async def operations(
             {
                 "amount": amount,
                 "currency": currency,
-                "requested_at": requested_at.isoformat()
-                if requested_at
-                else None,
+                "requested_at": requested_at.isoformat() if requested_at else None,
                 "processed": processed,
             }
             for amount, currency, requested_at, processed in withdrawals.all()
         ],
     }
-    
+
+
+# Регистрируем API и админку
 app.include_router(router)
 app.include_router(admin_router)
