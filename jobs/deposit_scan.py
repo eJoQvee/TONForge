@@ -6,14 +6,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
-from sqlalchemy import insert, select, text
+from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.db import get_session
 from database import models
 from services.referrals import pay_ref_bonuses
 
-# ENV
+# ==== ENV ====
 TON_API_KEY  = os.getenv("TON_API_KEY")
 TON_WALLET   = os.getenv("TON_WALLET")
 TRON_API_KEY = os.getenv("TRON_API_KEY")
@@ -22,8 +22,12 @@ USDT_WALLET  = os.getenv("USDT_WALLET")
 # окно просмотра (минуты)
 SCAN_WINDOW_MIN = int(os.getenv("SCAN_WINDOW_MIN", "10"))
 
+TON_API_BASE = "https://tonapi.io/v2"  # TonAPI v2 base
+
+
 async def _get_settings(session: AsyncSession) -> models.Config | None:
     return await session.get(models.Config, 1)
+
 
 async def _find_user_by_label(session: AsyncSession, label: str) -> Optional[models.User]:
     """
@@ -50,6 +54,7 @@ async def _find_user_by_label(session: AsyncSession, label: str) -> Optional[mod
     res = await session.execute(select(models.User).where(models.User.telegram_id == tg_id))
     return res.scalar_one_or_none()
 
+
 async def _save_transaction_and_credit(
     session: AsyncSession,
     user: models.User,
@@ -63,7 +68,6 @@ async def _save_transaction_and_credit(
     Идемпотентно добавляет транзакцию и пополняет баланс.
     Возвращает True, если зачисление прошло (не дубликат).
     """
-    # Сначала вставка с защ. от дублей
     stmt = (
         insert(models.Transaction)
         .values(
@@ -79,7 +83,7 @@ async def _save_transaction_and_credit(
     )
     res = await session.execute(stmt)
 
-    # Если дубликат — rows==0
+    # Если дубликат — rows == 0
     if getattr(res, "rowcount", 0) == 0:
         await session.rollback()
         return False
@@ -93,127 +97,165 @@ async def _save_transaction_and_credit(
     await session.commit()
     return True
 
+
 # ---------- TON ----------
 async def scan_ton(session: AsyncSession) -> None:
     if not (TON_API_KEY and TON_WALLET):
         return
+
     since = datetime.now(timezone.utc) - timedelta(minutes=SCAN_WINDOW_MIN)
 
-    # TonAPI пример; при необходимости подкорректируй путь/поля
-    url = f"https://tonapi.io/v2/blockchain/{TON_WALLET}/transactions?limit=100"  # входящие транзакции
+    # ✅ Правильный эндпоинт TonAPI v2:
+    url = f"{TON_API_BASE}/blockchain/accounts/{TON_WALLET}/transactions"
     headers = {"Authorization": f"Bearer {TON_API_KEY}"}
+    params = {"limit": 100}
 
     async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.get(url, headers=headers)
-        r.raise_for_status()
+        # Видно в логах крон-сервиса, какой URL реально дергаем
+        print(f"[TON SCAN] GET {url}", flush=True)
+        r = await client.get(url, headers=headers, params=params)
+        try:
+            r.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            body = r.text[:500] if r.text else ""
+            raise RuntimeError(
+                f"TonAPI error {r.status_code} for {r.request.url}. Body: {body}"
+            ) from e
         data = r.json()
 
     items = data.get("transactions") or data.get("items") or []
     cfg = await _get_settings(session)
-    min_dep = (cfg.min_deposit if cfg else 10.0)
+    min_dep = float(cfg.min_deposit if cfg else 10.0)
 
     for tx in items:
-        # приблизительный парсинг TonAPI (откорректируй по реальному ответу)
+        # timestamp/utime
         ts = tx.get("utime") or tx.get("timestamp") or tx.get("time")
         if ts:
             dt = datetime.fromtimestamp(int(ts), tz=timezone.utc)
             if dt < since:
                 continue
-        inbound = (tx.get("in_msg") or tx.get("inMessage") or {})
-        # адрес получателя должен быть наш
-        # часть API даёт msg["destination"], часть — в другом поле; при необходимости подправь
-        to_addr = (inbound.get("destination") or inbound.get("dst") or "").replace(" ", "")
+
+        # входящее сообщение
+        in_msg = tx.get("in_msg") or tx.get("inMessage") or {}
+
+        # кому пришло (иногда 'destination', иногда 'dst'; fallback из корня)
+        to_addr = (in_msg.get("destination") or in_msg.get("dst") or "").replace(" ", "")
+        if not to_addr:
+            to_addr = (tx.get("account") or {}).get("address") or ""
         if to_addr and TON_WALLET and to_addr != TON_WALLET:
             continue
 
+        # хэш
         tx_hash = tx.get("hash") or tx.get("transaction_id") or tx.get("id")
         if not tx_hash:
             continue
 
-        # Сумма, нано-тоны → TON
-        value = inbound.get("value") or inbound.get("amount") or 0
+        # сумма: наноTON → TON
+        raw_val = in_msg.get("value") or in_msg.get("amount") or 0
         try:
-            amount = float(value) / 1e9
+            amount = float(raw_val) / 1e9
         except Exception:
             continue
-        if amount <= 0 or amount < float(min_dep):
+        if amount <= 0 or amount < min_dep:
             continue
 
-        # Label (comment/payload/message)
-        label = (inbound.get("message") or inbound.get("comment") or inbound.get("payload") or "").strip()
+        # label из комментария/пейлоада
+        label = (in_msg.get("message") or in_msg.get("comment") or in_msg.get("payload") or "").strip()
         if not label:
-            # Если не смогли извлечь label — пропустим (мы опираемся на label для связи с юзером)
-            continue
+            continue  # без метки не связываем платёж с пользователем
 
+        # найти пользователя
         user = await _find_user_by_label(session, label)
         if not user or user.is_blocked:
             continue
 
+        # сохранить транзакцию и зачислить
         created = await _save_transaction_and_credit(
             session, user, amount, "TON", tx_hash, "TON", label
         )
         if created:
-            # Реферальные бонусы
             await pay_ref_bonuses(session, user, amount, "TON")
 
+
 # ---------- TRON / USDT TRC-20 ----------
+def _maybe_decode_hex(s: str) -> str:
+    try:
+        if s.startswith("0x"):
+            s = s[2:]
+        # только hex-символы?
+        int(s, 16)
+        return bytes.fromhex(s).decode("utf-8", errors="ignore")
+    except Exception:
+        return ""
+
+
 async def scan_tron(session: AsyncSession) -> None:
     if not (TRON_API_KEY and USDT_WALLET):
         return
+
     since = datetime.now(timezone.utc) - timedelta(minutes=SCAN_WINDOW_MIN)
 
-    # TronGrid пример: последние входящие TRC20 на адрес
-    url = f"https://api.trongrid.io/v1/blockchain/{USDT_WALLET}/transactions/trc20?limit=100&only_to=true"
+    # ✅ Правильный эндпоинт TronGrid:
+    url = f"https://api.trongrid.io/v1/accounts/{USDT_WALLET}/transactions/trc20"
     headers = {"TRON-PRO-API-KEY": TRON_API_KEY}
+    params = {"limit": 100, "only_to": "true"}
 
     async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.get(url, headers=headers)
-        r.raise_for_status()
+        print(f"[TRON SCAN] GET {url}", flush=True)
+        r = await client.get(url, headers=headers, params=params)
+        try:
+            r.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            body = r.text[:500] if r.text else ""
+            raise RuntimeError(
+                f"TronGrid error {r.status_code} for {r.request.url}. Body: {body}"
+            ) from e
         data = r.json()
 
     items = data.get("data", [])
     cfg = await _get_settings(session)
-    min_dep = (cfg.min_deposit if cfg else 10.0)
+    min_dep = float(cfg.min_deposit if cfg else 10.0)
 
     for tx in items:
-        # Фильтр только USDT
+        # фильтр только USDT
         token_sym = ((tx.get("token_info") or {}).get("symbol") or "").upper()
         if token_sym != "USDT":
             continue
 
-        # Время
+        # время
         ts = tx.get("block_timestamp")
         if ts:
             dt = datetime.fromtimestamp(int(ts) / 1000, tz=timezone.utc)
             if dt < since:
                 continue
 
-        # Хеш и сумма
+        # хеш и сумма
         tx_hash = tx.get("transaction_id")
         if not tx_hash:
             continue
 
-        # USDT имеет 6 знаков после запятой
+        # USDT имеет 6 знаков
         try:
             amount = float(tx.get("value", 0)) / 1e6
         except Exception:
             continue
-        if amount <= 0 or amount < float(min_dep):
+        if amount <= 0 or amount < min_dep:
             continue
 
-        # Label из memo — у TronGrid формат может отличаться, подстрой по факту
-        # Пробуем несколько полей:
+        # извлекаем label
         label = (tx.get("memo") or "").strip()
         if not label:
-            # Иногда memo лежит в raw_data["data"] (hex/base64) — добавь свой декодер при необходимости
+            # иногда memo в raw_data.data (hex/base64) — пробуем hex-декод
             raw_data = tx.get("raw_data") or {}
             raw_data_data = raw_data.get("data")
             if isinstance(raw_data_data, str):
-                # часто это hex; если хочешь — декодируй здесь
-                label = raw_data_data.strip()
+                decoded = _maybe_decode_hex(raw_data_data.strip())
+                if decoded:
+                    label = decoded.strip()
         if not label:
             continue
 
+        # найти пользователя
         user = await _find_user_by_label(session, label)
         if not user or user.is_blocked:
             continue
@@ -224,10 +266,12 @@ async def scan_tron(session: AsyncSession) -> None:
         if created:
             await pay_ref_bonuses(session, user, amount, "USDT")
 
+
 async def main():
     async with get_session() as session:
         await scan_ton(session)
         await scan_tron(session)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
