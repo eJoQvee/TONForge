@@ -15,7 +15,7 @@ async def cmd_referrals(message: Message):
     lang = message.from_user.language_code or "en"
     lang = lang if lang in ("ru", "en") else "en"
 
-    async with get_session() as session::
+    async with get_session() as session:
         result = await session.execute(
             select(models.User).where(models.User.telegram_id == message.from_user.id)
         )

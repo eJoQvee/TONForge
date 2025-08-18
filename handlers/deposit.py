@@ -31,7 +31,7 @@ async def cmd_deposit(message: Message):
         await message.answer("Currency must be TON or USDT")
         return
 
-    async with get_session() as session::
+    async with get_session() as session:
         cfg = await session.get(models.Config, 1)
         min_dep = cfg.min_deposit if cfg else 10
         if amount < min_dep:
