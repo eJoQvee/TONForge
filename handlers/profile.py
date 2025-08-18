@@ -12,7 +12,7 @@ router = Router()
 
 @router.message(F.text == "/profile")
 async def cmd_profile(message: Message):
-    async for session in get_session():
+    async with get_session() as session::
         result = await session.execute(
             select(models.User).where(models.User.telegram_id == message.from_user.id)
         )
