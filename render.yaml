@@ -1,7 +1,7 @@
 services:
   - type: web
     name: tonforge-web
-    env: python
+    runtime: python
     healthCheckPath: /healthz
     buildCommand: pip install -r requirements.txt
     preDeployCommand: python -m database.migrate
@@ -22,7 +22,7 @@ services:
 
   - type: worker
     name: tonforge-bot
-    env: python
+    runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: python -m main
     envVars:
@@ -41,16 +41,20 @@ services:
       - key: ENABLE_SCHEDULER
         value: "0"
 
-  - type: redis
-    name: tonforge-kv
-    plan: free
-
-cronJobs:
-  - name: daily-accruals
-    schedule: "0 1 * * *"
-    env: python
+  # Cron-джоба — это ТОЖЕ сервис (type: cron), не корневой cronJobs:
+  - type: cron
+    name: daily-accruals
+    runtime: python
+    schedule: "0 1 * * *"               # ежедневно 01:00 UTC
     buildCommand: pip install -r requirements.txt
     startCommand: python -m jobs.accruals
+
+  # Redis/KeyValue объявляется как отдельный сервис типа keyvalue
+  - type: keyvalue
+    name: tonforge-kv
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []                      # доступ только изнутри Render
 
 databases:
   - name: tonforge-db
