@@ -1,6 +1,6 @@
 from aiogram import Router
 
-# --- errors: поддерживаем errors_router и router ---
+# --- errors ---
 try:
     from .errors import errors_router
 except ImportError:
@@ -60,7 +60,7 @@ router = Router(name="root")
 # Всегда сначала ошибки
 router.include_router(errors_router)
 
-# Остальные роутеры
+# Остальные маршрутизаторы
 router.include_router(start_router)
 router.include_router(help_router)
 router.include_router(profile_router)
