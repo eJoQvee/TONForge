@@ -19,9 +19,16 @@ from admin.panel import router as admin_router
 app = FastAPI(title="TONForge Web", version="1.0.0")
 
 # CORS — оставляем, потом сузишь домены под прод
+import os
+ALLOWED_ORIGINS = [
+    os.getenv("BASE_WEBAPP_URL", "https://tonforge-web.onrender.com"),
+    "https://t.me",                # Telegram WebApp
+    "https://web.telegram.org",    # веб-версия Telegram
+    "http://localhost:3000",       # dev фронт
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
