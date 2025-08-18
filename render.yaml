@@ -2,9 +2,29 @@ services:
   - type: web
     name: tonforge-web
     env: python
+    healthCheckPath: /healthz
     buildCommand: pip install -r requirements.txt
     preDeployCommand: python -m database.migrate
     startCommand: uvicorn webview.backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: BASE_WEBAPP_URL
+        value: https://tonforge-web.onrender.com
+      - key: TON_API_KEY
+        sync: false
+      - key: TON_WALLET
+        sync: false
+      - key: REDIS_URL            # если будешь инжектить URL из Redis-ресурса
+        sync: false
+
+  - type: worker
+    name: tonforge-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m main
     envVars:
       - key: ENV
         value: production
@@ -16,36 +36,24 @@ services:
         sync: false
       - key: TON_WALLET
         sync: false
-      - key: BASE_WEBAPP_URL
-        sync: false
-
-  - type: worker
-    name: tonforge-bot
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m main
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: TELEGRAM_TOKEN
+      - key: REDIS_URL
         sync: false
       - key: ENABLE_SCHEDULER
         value: "0"
-      - key: TONAPI_KEY
-        sync: false
-      - key: TON_RECEIVER_WALLET
-        sync: false
 
 cronJobs:
   - name: daily-accruals
-    schedule: "0 1 * * *"  # ежедневно 01:00 UTC
+    schedule: "0 1 * * *"
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m jobs.accrualse: tonforge-kv
-    plan: free
-    ipAllowList: []                 # только внутренние подключения Render
-    maxmemoryPolicy: noeviction
+    startCommand: python -m jobs.accruals
 
 databases:
   - name: tonforge-db
     plan: free
+
+redis:
+  - name: tonforge-kv
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []         # доступ только изнутри Render (по умолчанию ок)
