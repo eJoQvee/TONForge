@@ -76,6 +76,7 @@ async def main() -> None:
             BotCommand(command="help", description="Помощь"),
             BotCommand(command="profile", description="Профиль"),
             BotCommand(command="withdraw", description="Вывод средств"),
+            BotCommand(command="balance", description="Баланс и дневной доход"),
         ]
     )
 
