@@ -14,7 +14,7 @@ try:
     else:
         load_dotenv()  # fallback: если .env лежит в CWD
 except Exception:
-    # если python-dotenv не установлен или иная мелкая ошибка — просто пропустим
+    # python-dotenv не обязателен в проде — пропускаем любые мелкие ошибки
     pass
 
 from sqlalchemy.ext.asyncio import (
@@ -26,16 +26,21 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 # --- 2) ENV и DATABASE_URL с безопасным dev-фолбэком ---
-ENV = os.getenv("ENV", "development")  # на Render поставишь ENV=production
+ENV = os.getenv("ENV", "development")  # на Render ставим ENV=production
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Dev-фолбэк: если переменная не задана и это НЕ прод — используем SQLite
+# Dev-фолбэк: если переменная не задана и это НЕ прод — используем локальный SQLite
 if not DATABASE_URL and ENV != "production":
     sqlite_path = (Path(__file__).resolve().parents[1] / "tonforge.db").as_posix()
     DATABASE_URL = f"sqlite+aiosqlite:///{sqlite_path}"
 
-# Нормализуем Postgres-URL под asyncpg (на случай postgres:// или postgresql:// без +asyncpg)
 def _normalize_database_url(url: str) -> str:
+    """
+    Нормализуем Postgres-URL под asyncpg:
+    - postgres:// → postgresql+asyncpg://
+    - postgresql:// → postgresql+asyncpg://
+    Остальные схемы возвращаем как есть.
+    """
     if not url:
         return url
     if url.startswith("postgres://"):
@@ -58,12 +63,24 @@ if not DATABASE_URL:
 class Base(DeclarativeBase):
     pass
 
-engine: AsyncEngine = create_async_engine(
-    DATABASE_URL,
+# Базовые параметры движка
+_engine_kwargs: dict = dict(
     echo=False,
     future=True,
     pool_pre_ping=True,
     pool_recycle=1800,
+)
+
+# Для asyncpg на Render принудительно включаем SSL
+# (даже если в URL нет ?ssl=true / sslmode=require)
+if DATABASE_URL.startswith("postgresql+asyncpg://"):
+    # Для asyncpg параметр 'ssl' может быть bool или SSLContext.
+    # True достаточно — будет использован системный доверенный контекст.
+    _engine_kwargs["connect_args"] = {"ssl": True}
+
+engine: AsyncEngine = create_async_engine(
+    DATABASE_URL,
+    **_engine_kwargs,
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -72,7 +89,7 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
 )
 
-# alias для совместимости
+# alias для совместимости со старым кодом
 async_session = AsyncSessionLocal
 
 @asynccontextmanager
