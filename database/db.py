@@ -1,4 +1,3 @@
-# database/db.py
 import os
 from pathlib import Path
 from typing import AsyncGenerator
@@ -14,7 +13,7 @@ try:
     else:
         load_dotenv()  # fallback: если .env лежит в CWD
 except Exception:
-    # python-dotenv не обязателен в проде — пропускаем любые мелкие ошибки
+    # python-dotenv не обязателен в продакшене — пропускаем любые мелкие ошибки
     pass
 
 from sqlalchemy.ext.asyncio import (
@@ -63,20 +62,25 @@ if not DATABASE_URL:
 class Base(DeclarativeBase):
     pass
 
-# Базовые параметры движка
+# Базовые параметры движка (устойчиво к обрывам соединений)
 _engine_kwargs: dict = dict(
     echo=False,
     future=True,
-    pool_pre_ping=True,
-    pool_recycle=1800,
+    pool_pre_ping=True,   # пинг перед выдачей коннекта
+    pool_recycle=900,     # перераздача коннектов раз в 15 минут
+    pool_size=5,
+    max_overflow=5,
+    pool_timeout=30,
 )
 
-# Для asyncpg на Render принудительно включаем SSL
-# (даже если в URL нет ?ssl=true / sslmode=require)
+# Для asyncpg на Render:
+# - принудительно включаем SSL
+# - отключаем кэш подготовленных запросов (важно при pgbouncer)
 if DATABASE_URL.startswith("postgresql+asyncpg://"):
-    # Для asyncpg параметр 'ssl' может быть bool или SSLContext.
-    # True достаточно — будет использован системный доверенный контекст.
-    _engine_kwargs["connect_args"] = {"ssl": True}
+    _engine_kwargs["connect_args"] = {
+        "ssl": True,
+        "statement_cache_size": 0,
+    }
 
 engine: AsyncEngine = create_async_engine(
     DATABASE_URL,

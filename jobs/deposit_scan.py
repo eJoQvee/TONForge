@@ -8,8 +8,9 @@ from typing import Optional
 import httpx
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import OperationalError, InterfaceError
 
-from database.db import get_session
+from database.db import get_session, engine
 from database import models
 from services.referrals import pay_ref_bonuses
 
@@ -267,11 +268,29 @@ async def scan_tron(session: AsyncSession) -> None:
             await pay_ref_bonuses(session, user, amount, "USDT")
 
 
-async def main():
+# ---------- запуск с мягким ретраем на обрыв соединения БД ----------
+async def _run_once():
     async with get_session() as session:
         await scan_ton(session)
         await scan_tron(session)
 
+async def main():
+    import asyncpg
+    for attempt in range(2):
+        try:
+            await _run_once()
+            break
+        except (asyncpg.ConnectionDoesNotExistError, OperationalError, InterfaceError) as e:
+            print(f"[DB] transient connection error: {e}. Attempt {attempt+1}/2", flush=True)
+            try:
+                await engine.dispose()
+            except Exception:
+                pass
+            if attempt == 0:
+                await asyncio.sleep(2)
+                continue
+            else:
+                raise
 
 if __name__ == "__main__":
     asyncio.run(main())
