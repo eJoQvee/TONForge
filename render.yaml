@@ -17,7 +17,7 @@ services:
         sync: false
       - key: TON_WALLET
         sync: false
-      - key: REDIS_URL            # если будешь инжектить URL из Redis-ресурса
+      - key: REDIS_URL
         sync: false
 
   - type: worker
@@ -41,6 +41,10 @@ services:
       - key: ENABLE_SCHEDULER
         value: "0"
 
+  - type: redis
+    name: tonforge-kv
+    plan: free
+
 cronJobs:
   - name: daily-accruals
     schedule: "0 1 * * *"
@@ -51,9 +55,3 @@ cronJobs:
 databases:
   - name: tonforge-db
     plan: free
-
-redis:
-  - name: tonforge-kv
-    plan: free
-    maxmemoryPolicy: noeviction
-    ipAllowList: []         # доступ только изнутри Render (по умолчанию ок)
