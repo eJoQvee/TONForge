@@ -21,7 +21,7 @@ services:
         sync: false
 
   - type: worker
-    name: tonforge-bot
+    name: tonforge-worker
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: python -m main
