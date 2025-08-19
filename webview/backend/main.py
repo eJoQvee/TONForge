@@ -1,17 +1,16 @@
+# webview/backend/main.py
 from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 from urllib.parse import parse_qsl
 
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.staticfiles import StaticFiles
 
 from database.db import session_generator as get_session
 from database import models
@@ -23,6 +22,7 @@ from bot_config import settings
 
 app = FastAPI(title="TONForge Web", version="1.0.0")
 
+# ——— CORS
 ALLOWED_ORIGINS = [
     os.getenv("BASE_WEBAPP_URL", "https://tonforge-web.onrender.com"),
     "https://t.me",
@@ -36,12 +36,122 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------- Health ----------
+# ——— Health
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:
     return {"ok": True}
 
-# ---------- helpers ----------
+# ——— ВСТРОЕННЫЙ ФРОНТ (раньше был index.html)
+INDEX_HTML = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>TONForge WebApp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    input, select, button { padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
+    button { cursor: pointer; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row > * { flex: 1; }
+    .muted { color: #6b7280; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body>
+  <h2>TONForge</h2>
+
+  <div class="card" id="profile">
+    <div class="muted">Loading profile…</div>
+  </div>
+
+  <div class="card">
+    <h3>New deposit</h3>
+    <div class="row" style="margin: 8px 0">
+      <input id="amount" type="number" placeholder="Amount" min="0" step="0.0000001"/>
+      <select id="currency">
+        <option value="TON">TON</option>
+        <option value="USDT">USDT</option>
+      </select>
+    </div>
+    <button id="btnCreate">Create deposit</button>
+    <div id="depositResult" class="muted" style="margin-top:8px"></div>
+  </div>
+
+  <script>
+    const tg = window.Telegram?.WebApp;
+    tg?.expand();
+
+    const initData = tg?.initData || ""; // подписанная строка из Telegram
+
+    async function api(path, opts = {}) {
+      const headers = Object.assign(
+        {"X-Telegram-Init-Data": initData},
+        opts.headers || {}
+      );
+      const res = await fetch(path, Object.assign({}, opts, {headers}));
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || res.statusText);
+      }
+      return res.json();
+    }
+
+    async function loadProfile() {
+      const out = document.getElementById("profile");
+      try {
+        const me = await api("/api/me");
+        out.innerHTML = `
+          <div><b>Telegram ID:</b> <span class="mono">${me.telegram_id}</span></div>
+          <div><b>Balances:</b> TON ${me.balance_ton} / USDT ${me.balance_usdt}</div>
+          <div><b>Daily %:</b> ${me.daily_percent}</div>
+          <div><b>Min deposit:</b> ${me.min_deposit} | <b>Min withdraw:</b> ${me.min_withdraw}</div>
+          <div><b>Referral link:</b> ${me.referral_link ? `<a href="${me.referral_link}">${me.referral_link}</a>` : '<span class="muted">N/A</span>'}</div>
+          <div><b>TON wallet:</b> <span class="mono">${me.ton_wallet || 'N/A'}</span></div>
+          <div><b>USDT wallet:</b> <span class="mono">${me.usdt_wallet || 'N/A'}</span></div>
+        `;
+      } catch (e) {
+        out.innerHTML = `<div style="color:#b91c1c">Error: ${e.message}</div>`;
+      }
+    }
+
+    document.getElementById("btnCreate").addEventListener("click", async () => {
+      const amount = parseFloat(document.getElementById("amount").value || "0");
+      const currency = document.getElementById("currency").value;
+      const out = document.getElementById("depositResult");
+      out.textContent = "Processing…";
+      try {
+        const data = await api("/api/deposits", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({amount, currency})
+        });
+        out.innerHTML = `
+          ✅ Created. Send <b>${data.amount} ${data.currency}</b> to<br/>
+          <span class="mono">${data.address}</span><br/>
+          with label/memo: <span class="mono">${data.label}</span>
+        `;
+      } catch (e) {
+        out.innerHTML = `<span style="color:#b91c1c">Error: ${e.message}</span>`;
+      }
+    });
+
+    loadProfile();
+  </script>
+</body>
+</html>
+"""
+
+# корень всегда отдаём как text/html
+@app.get("/", include_in_schema=False)
+async def index():
+    return HTMLResponse(INDEX_HTML)
+
+# ——— API
+router = APIRouter(prefix="/api")
+
 def _extract_telegram_id_from_init_data(request: Request) -> int | None:
     raw = request.headers.get("X-Telegram-Init-Data") or ""
     if not raw:
@@ -74,18 +184,15 @@ async def _get_or_create_user(session: AsyncSession, telegram_id: int, ip: str |
 def _bot_username() -> str:
     return getattr(settings, "bot_username", None) or os.getenv("BOT_USERNAME", "TONForge1_bot")
 
-# ---------- API ----------
-api = APIRouter(prefix="/api", tags=["api"])
-
-@api.get("/health")
-async def api_health() -> dict:
+@router.get("/health")
+async def health() -> dict:
     return {"status": "ok"}
 
 class DepositCreateIn(BaseModel):
     amount: float = Field(..., gt=0)
     currency: str  # "TON" | "USDT"
 
-@api.get("/me")
+@router.get("/me")
 async def me(request: Request, session: AsyncSession = Depends(get_session)) -> dict:
     telegram_id = _extract_telegram_id_from_init_data(request)
     if telegram_id is None:
@@ -116,7 +223,7 @@ async def me(request: Request, session: AsyncSession = Depends(get_session)) -> 
         "usdt_wallet": getattr(settings, "usdt_wallet", None),
     }
 
-@api.post("/deposits")
+@router.post("/deposits")
 async def create_deposit_endpoint(
     data: DepositCreateIn,
     request: Request,
@@ -150,31 +257,12 @@ async def create_deposit_endpoint(
         user_id=user.id,
         amount=amount,
         currency=currency,
-        address=None if currency == "TON" else address,
+        address=None if currency == "TON" else address,  # адрес сохраняем только для USDT
     )
 
     return {"id": dep.id, "amount": amount, "currency": currency, "address": address, "label": str(dep.id)}
 
-class GenerateLabelRequest(BaseModel):
-    user_id: int
-    method: str
-    amount: float
-
-@api.post("/generate_label")
-async def generate_label(
-    data: GenerateLabelRequest,
-    request: Request,
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    user = await _get_or_create_user(session, data.user_id, request.client.host if request.client else None)
-    method = data.method.upper()
-    address = settings.ton_wallet if method == "TON" else settings.usdt_wallet
-    dep = await deposit_service.create_deposit(
-        session, user.id, data.amount, method, address if method == "USDT" else None
-    )
-    return {"address": address, "label": str(dep.id)}
-
-@api.get("/referrals")
+@router.get("/referrals")
 async def referrals(
     user_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -184,7 +272,7 @@ async def referrals(
     earned = stats["bonus_ton"] + stats["bonus_usdt"]
     return {"link": link, "count": stats["invited"], "earned": earned}
 
-@api.get("/profile/{telegram_id}")
+@router.get("/profile/{telegram_id}")
 async def get_profile(
     telegram_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -192,7 +280,7 @@ async def get_profile(
     stats = await get_referral_stats(session, user.id)
     return {"telegram_id": user.telegram_id, "balance_ton": user.balance_ton, "balance_usdt": user.balance_usdt, "referrals": stats}
 
-@api.get("/operations")
+@router.get("/operations")
 async def operations(
     user_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -216,26 +304,6 @@ async def operations(
         ],
     }
 
-app.include_router(api)
+# Регистрируем API и админку
+app.include_router(router)
 app.include_router(admin_router)
-
-# ---------- Static frontend ----------
-FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
-INDEX_FILE = FRONTEND_DIR / "index.html"
-
-# ассеты (картинки/шрифты) — по /static/*
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend_static")
-
-# корень: отдать строго text/html
-@app.get("/", include_in_schema=False)
-async def root_index():
-    if INDEX_FILE.exists():
-        # читаем байты и явно задаём тип
-        return Response(INDEX_FILE.read_bytes(), media_type="text/html; charset=utf-8")
-    return Response(b"<h1>TONForge Web</h1><p>frontend not found.</p>", media_type="text/html; charset=utf-8")
-
-# на всякий случай тот же рендер по прямому /index.html
-@app.get("/index.html", include_in_schema=False)
-async def index_html():
-    return await root_index()
