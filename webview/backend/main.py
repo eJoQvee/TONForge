@@ -21,6 +21,7 @@ from services import deposit as deposit_service
 from admin.panel import router as admin_router
 from bot_config import settings
 
+# ----------------- App & CORS -----------------
 app = FastAPI(title="TONForge Web", version="1.0.0")
 
 ALLOWED_ORIGINS = [
@@ -36,10 +37,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ----------------- Health -----------------
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:
     return {"ok": True}
 
+# ----------------- Helpers -----------------
 def _extract_telegram_id_from_init_data(request: Request) -> int | None:
     raw = request.headers.get("X-Telegram-Init-Data") or ""
     if not raw:
@@ -72,6 +75,7 @@ async def _get_or_create_user(session: AsyncSession, telegram_id: int, ip: str |
 def _bot_username() -> str:
     return getattr(settings, "bot_username", None) or os.getenv("BOT_USERNAME", "TONForge1_bot")
 
+# ----------------- API -----------------
 api = APIRouter(prefix="/api", tags=["api"])
 
 @api.get("/health")
@@ -150,13 +154,7 @@ async def create_deposit_endpoint(
         address=None if currency == "TON" else address,
     )
 
-    return {
-        "id": dep.id,
-        "amount": amount,
-        "currency": currency,
-        "address": address,
-        "label": str(dep.id),
-    }
+    return {"id": dep.id, "amount": amount, "currency": currency, "address": address, "label": str(dep.id)}
 
 class GenerateLabelRequest(BaseModel):
     user_id: int
@@ -193,12 +191,7 @@ async def get_profile(
 ) -> dict:
     user = await _get_or_create_user(session, telegram_id, request.client.host if request.client else None)
     stats = await get_referral_stats(session, user.id)
-    return {
-        "telegram_id": user.telegram_id,
-        "balance_ton": user.balance_ton,
-        "balance_usdt": user.balance_usdt,
-        "referrals": stats,
-    }
+    return {"telegram_id": user.telegram_id, "balance_ton": user.balance_ton, "balance_usdt": user.balance_usdt, "referrals": stats}
 
 @api.get("/operations")
 async def operations(
@@ -227,12 +220,17 @@ async def operations(
 app.include_router(api)
 app.include_router(admin_router)
 
-# -------- Static frontend on root --------
+# ----------------- Static frontend -----------------
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
+INDEX_FILE = FRONTEND_DIR / "index.html"
 
+# Отдаём index.html ЯВНО как text/html (важно для WebView)
+@app.get("/", include_in_schema=False, response_class=HTMLResponse)
+async def root_index():
+    if INDEX_FILE.exists():
+        return HTMLResponse(INDEX_FILE.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>TONForge Web</h1><p>frontend not found.</p>")
+
+# Если понадобятся дополнительные ассеты (картинки/иконки), раздаём их тут
 if FRONTEND_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
-else:
-    @app.get("/", include_in_schema=False, response_class=HTMLResponse)
-    async def root_index():
-        return "<h1>TONForge Web</h1><p>frontend not found.</p>"
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend_static")
