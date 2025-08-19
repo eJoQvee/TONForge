@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import sys
 from importlib import import_module
@@ -9,13 +11,9 @@ from database.db import engine, Base as DbBase, DATABASE_URL, ENV
 
 
 def _import_models() -> "list[object]":
-    """
-    Импортируем модули с моделями, чтобы они зарегистрировались в metadata.
-    """
     modules: list[object] = []
     candidates: Sequence[str] = (
-        "database.models",              # общий файл со всеми моделями
-        # остальные — на случай, если где-то разнесёшь по модулям
+        "database.models",
         "database.models.user",
         "database.models.deposit",
         "database.models.withdrawal",
@@ -40,7 +38,7 @@ async def migrate() -> None:
 
     modules = _import_models()
 
-    # Собираем все возможные metadata, на случай, если вдруг есть несколько Base
+    # Собираем все metadata (на случай, если где-то другой Base)
     metadatas = {DbBase.metadata}
     for m in modules:
         model_base = getattr(m, "Base", None)
@@ -48,16 +46,15 @@ async def migrate() -> None:
             if model_base is not DbBase:
                 metadatas.add(model_base.metadata)
 
-    # Диагностика: какие таблицы видим до create_all
     for md in metadatas:
         print(f"[MIGRATE] metadata tables before: {sorted(md.tables.keys())}")
 
     async with engine.begin() as conn:
-        # 1) Создаём все таблицы для каждого metadata
+        # 1) Создаём недостающие таблицы
         for md in metadatas:
             await conn.run_sync(md.create_all)
 
-        # 2) Инспекция — проверим необходимые колонки/строки и дольём недостающее
+        # helpers
         def _table_exists(sync_conn, table: str) -> bool:
             insp = inspect(sync_conn)
             return table in insp.get_table_names()
@@ -70,35 +67,21 @@ async def migrate() -> None:
                 return False
             return col in cols
 
-        # --- users: ensure is_blocked / last_ip ---
-        users_exist = await conn.run_sync(_table_exists, "users")
-        if not users_exist:
-            print("[MIGRATE] warn: table 'users' not found even after create_all().", file=sys.stderr)
-        else:
+        # users: добавочные поля
+        if await conn.run_sync(_table_exists, "users"):
             if not await conn.run_sync(_has_column, "users", "is_blocked"):
                 print("[MIGRATE] add column users.is_blocked ...")
-                await conn.execute(text(
-                    "ALTER TABLE users ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE"
-                ))
+                await conn.execute(
+                    text("ALTER TABLE users ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE")
+                )
             if not await conn.run_sync(_has_column, "users", "last_ip"):
                 print("[MIGRATE] add column users.last_ip ...")
-                await conn.execute(text(
-                    "ALTER TABLE users ADD COLUMN last_ip VARCHAR"
-                ))
-
-        # --- deposits: ensure address ---
-        deposits_exist = await conn.run_sync(_table_exists, "deposits")
-        if deposits_exist and not await conn.run_sync(_has_column, "deposits", "address"):
-            print("[MIGRATE] add column deposits.address ...")
-            await conn.execute(text(
-                "ALTER TABLE deposits ADD COLUMN address VARCHAR"
-            ))
-
-        # --- settings: ensure default row id=1 ---
-        settings_exist = await conn.run_sync(_table_exists, "settings")
-        if not settings_exist:
-            print("[MIGRATE] warn: table 'settings' not found even after create_all().", file=sys.stderr)
+                await conn.execute(text("ALTER TABLE users ADD COLUMN last_ip VARCHAR"))
         else:
+            print("[MIGRATE] warn: table 'users' not found after create_all().", file=sys.stderr)
+
+        # settings: дефолтная строка
+        if await conn.run_sync(_table_exists, "settings"):
             cnt = await conn.scalar(text("SELECT COUNT(*) FROM settings WHERE id=1"))
             if not cnt:
                 print("[MIGRATE] insert default settings row (id=1) ...")
@@ -109,6 +92,35 @@ async def migrate() -> None:
                         "VALUES (1, 0.023, 10, 50, 24, '')"
                     )
                 )
+        else:
+            print("[MIGRATE] warn: table 'settings' not found after create_all().", file=sys.stderr)
+
+        # deposits: добавляем недостающие поля
+        if await conn.run_sync(_table_exists, "deposits"):
+            if not await conn.run_sync(_has_column, "deposits", "address"):
+                print("[MIGRATE] add column deposits.address ...")
+                await conn.execute(text("ALTER TABLE deposits ADD COLUMN address VARCHAR"))
+            if not await conn.run_sync(_has_column, "deposits", "is_active"):
+                print("[MIGRATE] add column deposits.is_active ...")
+                await conn.execute(
+                    text("ALTER TABLE deposits ADD COLUMN is_active BOOLEAN DEFAULT FALSE")
+                )
+        else:
+            print("[MIGRATE] warn: table 'deposits' not found after create_all().", file=sys.stderr)
+
+        # transactions: по возможности обеспечим уникальность tx_hash
+        if await conn.run_sync(_table_exists, "transactions"):
+            try:
+                # Postgres: добавим constraint, если его нет
+                await conn.execute(
+                    text(
+                        "ALTER TABLE transactions "
+                        "ADD CONSTRAINT IF NOT EXISTS uq_transactions_tx_hash UNIQUE (tx_hash)"
+                    )
+                )
+            except Exception:
+                # На SQLite ALTER TABLE ограничен — просто молча пропустим
+                pass
 
     print("[MIGRATE] Done.")
 
