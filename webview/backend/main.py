@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl
 
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +22,7 @@ from services import deposit as deposit_service
 from admin.panel import router as admin_router
 from bot_config import settings
 
-
+# ----------------- App & CORS -----------------
 app = FastAPI(title="TONForge Web", version="1.0.0")
 
 ALLOWED_ORIGINS = [
@@ -38,17 +38,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+# ----------------- Health -----------------
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:
     return {"ok": True}
 
-
+# ----------------- Helpers -----------------
 def _extract_telegram_id_from_init_data(request: Request) -> int | None:
-    """
-    Берём Telegram user.id из заголовка X-Telegram-Init-Data.
-    (Подпись initData в этом проекте не проверяем — упрощённо.)
-    """
     raw = request.headers.get("X-Telegram-Init-Data") or ""
     if not raw:
         return None
@@ -63,13 +59,8 @@ def _extract_telegram_id_from_init_data(request: Request) -> int | None:
         return None
     return None
 
-
-async def _get_or_create_user(
-    session: AsyncSession, telegram_id: int, ip: str | None = None
-) -> models.User:
-    res = await session.execute(
-        select(models.User).where(models.User.telegram_id == telegram_id)
-    )
+async def _get_or_create_user(session: AsyncSession, telegram_id: int, ip: str | None = None) -> models.User:
+    res = await session.execute(select(models.User).where(models.User.telegram_id == telegram_id))
     user = res.scalar_one_or_none()
     if not user:
         user = models.User(telegram_id=telegram_id, language="en")
@@ -82,27 +73,19 @@ async def _get_or_create_user(
         raise HTTPException(status_code=403, detail="user_blocked")
     return user
 
-
 def _bot_username() -> str:
-    return getattr(settings, "bot_username", None) or os.getenv(
-        "BOT_USERNAME", "TONForge1_bot"
-    )
+    return getattr(settings, "bot_username", None) or os.getenv("BOT_USERNAME", "TONForge1_bot")
 
-
-# -------- API --------
-
+# ----------------- API -----------------
 api = APIRouter(prefix="/api", tags=["api"])
-
 
 @api.get("/health")
 async def api_health() -> dict:
     return {"status": "ok"}
 
-
 class DepositCreateIn(BaseModel):
     amount: float = Field(..., gt=0)
     currency: str  # "TON" | "USDT"
-
 
 @api.get("/me")
 async def me(request: Request, session: AsyncSession = Depends(get_session)) -> dict:
@@ -114,14 +97,12 @@ async def me(request: Request, session: AsyncSession = Depends(get_session)) -> 
     if telegram_id is None:
         raise HTTPException(status_code=401, detail="no_telegram_context")
 
-    user = await _get_or_create_user(
-        session, telegram_id, request.client.host if request.client else None
-    )
+    user = await _get_or_create_user(session, telegram_id, request.client.host if request.client else None)
 
     cfg = await session.get(models.Config, 1)
     daily_percent = float(cfg.daily_percent if cfg else 0.023)
-    min_deposit = float(cfg.min_deposit if cfg else 10.0)
-    min_withdraw = float(cfg.min_withdraw if cfg else 50.0)
+    min_deposit   = float(cfg.min_deposit if cfg else 10.0)
+    min_withdraw  = float(cfg.min_withdraw if cfg else 50.0)
 
     ref_link = f"https://t.me/{_bot_username()}?start={user.telegram_id}"
 
@@ -136,7 +117,6 @@ async def me(request: Request, session: AsyncSession = Depends(get_session)) -> 
         "ton_wallet": getattr(settings, "ton_wallet", None),
         "usdt_wallet": getattr(settings, "usdt_wallet", None),
     }
-
 
 @api.post("/deposits")
 async def create_deposit_endpoint(
@@ -153,59 +133,43 @@ async def create_deposit_endpoint(
         if telegram_id is None:
             raise HTTPException(status_code=401, detail="no_telegram_context")
 
-        user = await _get_or_create_user(
-            session, telegram_id, request.client.host if request.client else None
-        )
+        user = await _get_or_create_user(session, telegram_id, request.client.host if request.client else None)
 
         cfg = await session.get(models.Config, 1)
         min_dep = float(cfg.min_deposit if cfg else 10.0)
         amount = float(data.amount)
         currency = data.currency.upper()
         if currency not in {"TON", "USDT"}:
-            raise HTTPException(
-                status_code=400, detail="currency_must_be_TON_or_USDT"
-            )
+            raise HTTPException(status_code=400, detail="currency_must_be_TON_or_USDT")
         if amount < min_dep:
             raise HTTPException(status_code=400, detail=f"min_deposit_is_{min_dep}")
 
         address = settings.ton_wallet if currency == "TON" else settings.usdt_wallet
         if not address:
-            raise HTTPException(
-                status_code=500, detail=f"{currency}_address_not_configured"
-            )
+            raise HTTPException(status_code=500, detail=f"{currency}_address_not_configured")
 
         dep = await deposit_service.create_deposit(
             session,
             user_id=user.id,
             amount=amount,
             currency=currency,
-            address=None if currency == "TON" else address,  # адрес храним только для USDT
+            address=None if currency == "TON" else address,  # адрес хранится только для USDT
         )
 
-        return {
-            "id": dep.id,
-            "amount": amount,
-            "currency": currency,
-            "address": address,
-            "label": str(dep.id),  # label/memo — id депозита
-        }
+        return {"id": dep.id, "amount": amount, "currency": currency, "address": address, "label": str(dep.id)}
     except HTTPException:
         raise
     except Exception as e:
-        # в dev/стейдже удобно вернуть явный текст ошибки
         import traceback, sys
-
         print("[/api/deposits] error:", e, file=sys.stderr)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# совместимость со старым фронтом
+# Совместимость со старым фронтом
 class GenerateLabelRequest(BaseModel):
     user_id: int
     method: str
     amount: float
-
 
 @api.post("/generate_label")
 async def generate_label(
@@ -213,9 +177,7 @@ async def generate_label(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    user = await _get_or_create_user(
-        session, data.user_id, request.client.host if request.client else None
-    )
+    user = await _get_or_create_user(session, data.user_id, request.client.host if request.client else None)
     method = data.method.upper()
     address = settings.ton_wallet if method == "TON" else settings.usdt_wallet
     dep = await deposit_service.create_deposit(
@@ -223,27 +185,21 @@ async def generate_label(
     )
     return {"address": address, "label": str(dep.id)}
 
-
 @api.get("/referrals")
 async def referrals(
     user_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
-    user = await _get_or_create_user(
-        session, user_id, request.client.host if request.client else None
-    )
+    user = await _get_or_create_user(session, user_id, request.client.host if request.client else None)
     stats = await get_referral_stats(session, user.id)
     link = f"https://t.me/{_bot_username()}?start={user_id}"
     earned = stats["bonus_ton"] + stats["bonus_usdt"]
     return {"link": link, "count": stats["invited"], "earned": earned}
 
-
 @api.get("/profile/{telegram_id}")
 async def get_profile(
     telegram_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
-    user = await _get_or_create_user(
-        session, telegram_id, request.client.host if request.client else None
-    )
+    user = await _get_or_create_user(session, telegram_id, request.client.host if request.client else None)
     stats = await get_referral_stats(session, user.id)
     return {
         "telegram_id": user.telegram_id,
@@ -252,63 +208,53 @@ async def get_profile(
         "referrals": stats,
     }
 
-
 @api.get("/operations")
 async def operations(
     user_id: int, request: Request, session: AsyncSession = Depends(get_session)
 ) -> dict:
-    user = await _get_or_create_user(
-        session, user_id, request.client.host if request.client else None
-    )
+    user = await _get_or_create_user(session, user_id, request.client.host if request.client else None)
     deposits = await session.execute(
-        select(
-            models.Deposit.amount, models.Deposit.currency, models.Deposit.created_at
-        ).where(models.Deposit.user_id == user.id)
+        select(models.Deposit.amount, models.Deposit.currency, models.Deposit.created_at)
+        .where(models.Deposit.user_id == user.id)
     )
     withdrawals = await session.execute(
-        select(
-            models.Withdrawal.amount,
-            models.Withdrawal.currency,
-            models.Withdrawal.requested_at,
-            models.Withdrawal.processed,
-        ).where(models.Withdrawal.user_id == user.id)
+        select(models.Withdrawal.amount, models.Withdrawal.currency, models.Withdrawal.requested_at, models.Withdrawal.processed)
+        .where(models.Withdrawal.user_id == user.id)
     )
     return {
         "deposits": [
-            {
-                "amount": a,
-                "currency": c,
-                "created_at": (dt.isoformat() if dt else None),
-            }
+            {"amount": a, "currency": c, "created_at": (dt.isoformat() if dt else None)}
             for a, c, dt in deposits.all()
         ],
         "withdrawals": [
-            {
-                "amount": a,
-                "currency": c,
-                "requested_at": (dt.isoformat() if dt else None),
-                "processed": p,
-            }
+            {"amount": a, "currency": c, "requested_at": (dt.isoformat() if dt else None), "processed": p}
             for a, c, dt, p in withdrawals.all()
         ],
     }
 
-
-# Подключаем роутеры
+# Регистрируем API и админку
 app.include_router(api)
 app.include_router(admin_router)
 
-# -------- статика фронтенда --------
-
+# ----------------- Static frontend -----------------
+# Раздаём файлы фронта со /static (а не на /), чтобы исключить конфликт с корнем,
+# и сами явно отдаём index.html как text/html.
 frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
 index_file = frontend_dir / "index.html"
 
 if frontend_dir.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+    app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
 
-
-@app.get("/", include_in_schema=False)
-async def root_index():
+@app.get("/", include_in_schema=False, response_class=HTMLResponse)
+async def root_index() -> HTMLResponse:
     if index_file.exists():
-        return FileResponse(str(index_file))
-    return {"ok": True, "hint": "frontend not found at webview/frontend/index.html"}
+        html = index_file.read_text(encoding="utf-8")
+        # Явно укажем content-type и отключим кэш, чтобы Телеграм не «залипал»
+        return HTMLResponse(content=html, media_type="text/html; charset=utf-8",
+                            headers={"Cache-Control": "no-store"})
+    return HTMLResponse("<h1>TONForge Web</h1><p>frontend not found</p>")
+
+# Полезно: чтобы прямой вызов /index.html тоже работал корректно как HTML
+@app.get("/index.html", include_in_schema=False, response_class=HTMLResponse)
+async def index_html_alias() -> HTMLResponse:
+    return await root_index()
