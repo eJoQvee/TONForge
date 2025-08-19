@@ -1,4 +1,3 @@
-# webview/backend/main.py
 from __future__ import annotations
 
 import json
@@ -22,7 +21,6 @@ from bot_config import settings
 
 app = FastAPI(title="TONForge Web", version="1.0.0")
 
-# ——— CORS
 ALLOWED_ORIGINS = [
     os.getenv("BASE_WEBAPP_URL", "https://tonforge-web.onrender.com"),
     "https://t.me",
@@ -36,12 +34,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ——— Health
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:
     return {"ok": True}
 
-# ——— ВСТРОЕННЫЙ ФРОНТ (раньше был index.html)
+# -------- Встроенный фронт с надёжным фолбэком user_id --------
 INDEX_HTML = """<!doctype html>
 <html lang="en">
 <head>
@@ -50,14 +47,15 @@ INDEX_HTML = """<!doctype html>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 16px; }
-    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-    input, select, button { padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
+    body { font-family: system-ui, sans-serif; margin: 16px; color: var(--tg-theme-text-color,#111); background: var(--tg-theme-bg-color,#fff); }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px; background: var(--tg-theme-secondary-bg-color,#fff); }
+    input, select, button { padding: 10px; border-radius: 10px; border: 1px solid #d1d5db; background: transparent; color: inherit; }
     button { cursor: pointer; }
     .row { display: flex; gap: 8px; align-items: center; }
     .row > * { flex: 1; }
     .muted { color: #6b7280; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .err { color: #ef4444; white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -70,7 +68,7 @@ INDEX_HTML = """<!doctype html>
   <div class="card">
     <h3>New deposit</h3>
     <div class="row" style="margin: 8px 0">
-      <input id="amount" type="number" placeholder="Amount" min="0" step="0.0000001"/>
+      <input id="amount" type="number" placeholder="Amount" min="0" step="0.0000001" value="10"/>
       <select id="currency">
         <option value="TON">TON</option>
         <option value="USDT">USDT</option>
@@ -82,16 +80,22 @@ INDEX_HTML = """<!doctype html>
 
   <script>
     const tg = window.Telegram?.WebApp;
-    tg?.expand();
+    tg?.ready?.();
+    tg?.expand?.();
 
-    const initData = tg?.initData || ""; // подписанная строка из Telegram
+    // Надёжный способ получить user_id, даже если initData пуст
+    const initDataStr = tg?.initData || "";
+    const userId = tg?.initDataUnsafe?.user?.id || null;
 
+    // Универсальная функция: добавляем и заголовок, и ?user_id=
     async function api(path, opts = {}) {
+      const url = new URL(path, window.location.origin);
+      if (userId) url.searchParams.set("user_id", String(userId));
       const headers = Object.assign(
-        {"X-Telegram-Init-Data": initData},
+        {"X-Telegram-Init-Data": initDataStr},
         opts.headers || {}
       );
-      const res = await fetch(path, Object.assign({}, opts, {headers}));
+      const res = await fetch(url.toString(), Object.assign({}, opts, {headers}));
       if (!res.ok) {
         const txt = await res.text();
         throw new Error(txt || res.statusText);
@@ -100,10 +104,10 @@ INDEX_HTML = """<!doctype html>
     }
 
     async function loadProfile() {
-      const out = document.getElementById("profile");
+      const box = document.getElementById("profile");
       try {
         const me = await api("/api/me");
-        out.innerHTML = `
+        box.innerHTML = `
           <div><b>Telegram ID:</b> <span class="mono">${me.telegram_id}</span></div>
           <div><b>Balances:</b> TON ${me.balance_ton} / USDT ${me.balance_usdt}</div>
           <div><b>Daily %:</b> ${me.daily_percent}</div>
@@ -113,7 +117,7 @@ INDEX_HTML = """<!doctype html>
           <div><b>USDT wallet:</b> <span class="mono">${me.usdt_wallet || 'N/A'}</span></div>
         `;
       } catch (e) {
-        out.innerHTML = `<div style="color:#b91c1c">Error: ${e.message}</div>`;
+        box.innerHTML = `<div class="err">Error: ${e.message}</div>`;
       }
     }
 
@@ -134,7 +138,7 @@ INDEX_HTML = """<!doctype html>
           with label/memo: <span class="mono">${data.label}</span>
         `;
       } catch (e) {
-        out.innerHTML = `<span style="color:#b91c1c">Error: ${e.message}</span>`;
+        out.innerHTML = `<span class="err">Error: ${e.message}</span>`;
       }
     });
 
@@ -144,12 +148,11 @@ INDEX_HTML = """<!doctype html>
 </html>
 """
 
-# корень всегда отдаём как text/html
 @app.get("/", include_in_schema=False)
 async def index():
     return HTMLResponse(INDEX_HTML)
 
-# ——— API
+# -------- API --------
 router = APIRouter(prefix="/api")
 
 def _extract_telegram_id_from_init_data(request: Request) -> int | None:
@@ -194,7 +197,9 @@ class DepositCreateIn(BaseModel):
 
 @router.get("/me")
 async def me(request: Request, session: AsyncSession = Depends(get_session)) -> dict:
+    # пробуем по заголовку
     telegram_id = _extract_telegram_id_from_init_data(request)
+    # и фолбэк: ?user_id= (его теперь фронт всегда добавляет)
     if telegram_id is None:
         q_user = request.query_params.get("user_id")
         if q_user and q_user.isdigit():
@@ -257,7 +262,7 @@ async def create_deposit_endpoint(
         user_id=user.id,
         amount=amount,
         currency=currency,
-        address=None if currency == "TON" else address,  # адрес сохраняем только для USDT
+        address=None if currency == "TON" else address,
     )
 
     return {"id": dep.id, "amount": amount, "currency": currency, "address": address, "label": str(dep.id)}
@@ -304,6 +309,5 @@ async def operations(
         ],
     }
 
-# Регистрируем API и админку
 app.include_router(router)
 app.include_router(admin_router)
