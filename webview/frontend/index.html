@@ -20,7 +20,6 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;meta charset="utf-8"/&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;title&gt;TONForge WebApp&lt;/title&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1"/&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;!-- Telegram WebApp SDK --&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;script src="https://telegram.org/js/telegram-web-app.js"&gt;&lt;/script&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;style&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>body { font-family: system-ui, sans-serif; margin: 16px; }</span></p>
@@ -57,7 +56,7 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const tg = window.Telegram?.WebApp;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>tg?.expand();</span></p>
 <p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const initData = tg?.initData || ""; // Телеграм положит сюда подписанную строку</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const initData = tg?.initData || ""; // Подписанная строка от Telegram</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>async function api(path, opts = {}) {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const headers = Object.assign(</span></p>
@@ -103,7 +102,7 @@
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>out.innerHTML = `</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>✅ Created. Send &lt;b&gt;${data.amount} ${data.currency}&lt;/b&gt; to&lt;br/&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>&lt;span class="mono"&gt;${data.address}&lt;/span&gt;&lt;br/&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>with label/memo: &lt;span class="mono"&gt;${data.label}&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>with &lt;b&gt;label/memo&lt;/b&gt;: &lt;span class="mono"&gt;${data.label}&lt;/span&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>`;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>} catch (e) {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>out.innerHTML = `&lt;span style="color:#b91c1c"&gt;Error: ${e.message}&lt;/span&gt;`;</span></p>
