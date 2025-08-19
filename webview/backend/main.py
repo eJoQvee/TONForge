@@ -7,7 +7,7 @@ from urllib.parse import parse_qsl
 
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,8 +20,6 @@ from utils.antifraud import check_and_update_ip
 from services import deposit as deposit_service
 from admin.panel import router as admin_router
 from bot_config import settings
-
-# ----------------- App & CORS -----------------
 
 app = FastAPI(title="TONForge Web", version="1.0.0")
 
@@ -38,19 +36,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----------------- Health -----------------
-
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:
     return {"ok": True}
 
-# ----------------- Helpers -----------------
-
 def _extract_telegram_id_from_init_data(request: Request) -> int | None:
-    """
-    Берём Telegram user.id из заголовка X-Telegram-Init-Data.
-    В проде нужно проверять подпись (hash). Сейчас – упрощённо.
-    """
     raw = request.headers.get("X-Telegram-Init-Data") or ""
     if not raw:
         return None
@@ -65,12 +55,10 @@ def _extract_telegram_id_from_init_data(request: Request) -> int | None:
         return None
     return None
 
-
 async def _get_or_create_user(session: AsyncSession, telegram_id: int, ip: str | None = None) -> models.User:
     res = await session.execute(select(models.User).where(models.User.telegram_id == telegram_id))
     user = res.scalar_one_or_none()
     if not user:
-        # автосоздание (в боте ты регистрируешь на /start — тут делаем мягкий fallback)
         user = models.User(telegram_id=telegram_id, language="en")
         session.add(user)
         await session.commit()
@@ -81,12 +69,8 @@ async def _get_or_create_user(session: AsyncSession, telegram_id: int, ip: str |
         raise HTTPException(status_code=403, detail="user_blocked")
     return user
 
-
 def _bot_username() -> str:
     return getattr(settings, "bot_username", None) or os.getenv("BOT_USERNAME", "TONForge1_bot")
-
-
-# ----------------- API -----------------
 
 api = APIRouter(prefix="/api", tags=["api"])
 
@@ -100,9 +84,7 @@ class DepositCreateIn(BaseModel):
 
 @api.get("/me")
 async def me(request: Request, session: AsyncSession = Depends(get_session)) -> dict:
-    # 1) из Telegram header
     telegram_id = _extract_telegram_id_from_init_data(request)
-    # 2) dev-фолбэк по query ?user_id=
     if telegram_id is None:
         q_user = request.query_params.get("user_id")
         if q_user and q_user.isdigit():
@@ -165,7 +147,7 @@ async def create_deposit_endpoint(
         user_id=user.id,
         amount=amount,
         currency=currency,
-        address=None if currency == "TON" else address,  # адрес хранится только для USDT
+        address=None if currency == "TON" else address,
     )
 
     return {
@@ -173,10 +155,9 @@ async def create_deposit_endpoint(
         "amount": amount,
         "currency": currency,
         "address": address,
-        "label": str(dep.id),  # label/memo — id депозита
+        "label": str(dep.id),
     }
 
-# Сохраняем твои дополнительные эндпоинты — они пригодятся фронту позже
 class GenerateLabelRequest(BaseModel):
     user_id: int
     method: str
@@ -188,7 +169,6 @@ async def generate_label(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    # совместимость со старым фронтом/скриптами
     user = await _get_or_create_user(session, data.user_id, request.client.host if request.client else None)
     method = data.method.upper()
     address = settings.ton_wallet if method == "TON" else settings.usdt_wallet
@@ -244,22 +224,15 @@ async def operations(
         ],
     }
 
-# Роутеры
 app.include_router(api)
 app.include_router(admin_router)
 
-# ----------------- Static frontend -----------------
+# -------- Static frontend on root --------
+FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
 
-frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
-index_file = frontend_dir / "index.html"
-
-if frontend_dir.exists():
-    # сначала API/админка, потом — статика на корень
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
-
-# fallback на index.html, если кто-то обратится к "/" и StaticFiles не перехватил
-@app.get("/", include_in_schema=False)
-async def root_index():
-    if index_file.exists():
-        return FileResponse(str(index_file))
-    return {"ok": True, "hint": "frontend not found at webview/frontend/index.html"}
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+else:
+    @app.get("/", include_in_schema=False, response_class=HTMLResponse)
+    async def root_index():
+        return "<h1>TONForge Web</h1><p>frontend not found.</p>"
